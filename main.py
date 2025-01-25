@@ -1,5 +1,3 @@
-import tkinter as tk
-from tkinter import ttk
 from tkinter import filedialog
 from gui import show_duplicate_files
 
