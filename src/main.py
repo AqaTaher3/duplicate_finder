@@ -1,8 +1,6 @@
 import wx
-from finder import DuplicateFinder  # Instead of DuplicateFinderLogic
-from gui import *
-from logic import *
-from finder import *
+from gui import FileFinderFrame
+from logic import FileHandler
 
 
 def main():
@@ -14,19 +12,17 @@ def main():
         dialog.Destroy()
 
         if folder_selected:
-            # Create logic instance to handle the duplicate file logic
-            logic = DuplicateFinderLogic(folder_selected)
+            # Create handler instance to handle the file logic
+            handler = FileHandler(folder_selected)
 
-            # Pass None for progress_bar and progress_label
-            finder = DuplicateFinder(folder_selected, None, None)
-            logic = DuplicateFinderLogic(folder_selected)  # Ensure this is set up properly
-            frame = DuplicateFinderFrame(None, "Duplicate Files", folder_selected, logic)
+            # Create the GUI frame and pass the handler instance along with folder
+            frame = FileFinderFrame(None, "File Finder", folder_selected, handler)
 
             # Start the GUI event loop
             app.MainLoop()
 
         else:
-            print("No folder selected, exiting application.", "Error")
+            wx.MessageBox("No folder selected, exiting application.", "Error", wx.OK | wx.ICON_ERROR)
     else:
         dialog.Destroy()
 

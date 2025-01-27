@@ -2,8 +2,8 @@ import os
 import hashlib
 
 
-class DuplicateFinder:
-    def __init__(self, folder_path, progress_bar, progress_label):
+class FileFinder:
+    def __init__(self, folder_path, progress_bar=None, progress_label=None):
         self.folder_path = folder_path
         self.progress_bar = progress_bar
         self.progress_label = progress_label
@@ -20,10 +20,10 @@ class DuplicateFinder:
             print(f"Error reading file {file_path}: {str(e)}")
             return None
 
-    def find_duplicates(self):
-        """Find duplicates by comparing file hashes."""
+    def find_files(self):
+        """Find files by comparing file hashes."""
         file_hashes = {}
-        duplicates = {}
+        file_sets = {}
         total_files = sum([len(files) for _, _, files in os.walk(self.folder_path)])
         processed_files = 0
 
@@ -36,21 +36,21 @@ class DuplicateFinder:
                 file_hash = self._hash_file(file_path)
                 if file_hash:
                     if file_hash in file_hashes:
-                        duplicates.setdefault(file_hash, [file_hashes[file_hash]]).append(file_path)
+                        file_sets.setdefault(file_hash, [file_hashes[file_hash]]).append(file_path)
                     else:
                         file_hashes[file_hash] = file_path
 
-                # Update progress bar periodically (every 10 files or 5%)
+                # Update progress bar
                 processed_files += 1
-                if processed_files % 10 == 0 or processed_files == total_files:
-                    if self.progress_bar:
-                        progress_percentage = int((processed_files / total_files) * 100)
-                        self.progress_bar.SetValue(progress_percentage)
-                        self.progress_label.SetLabel(f"Progress: {progress_percentage}%")
+                if self.progress_bar:
+                    progress_percentage = int((processed_files / total_files) * 100)
+                    self.progress_bar.SetValue(progress_percentage)
+                    self.progress_label.SetLabel(f"Progress: {progress_percentage}%")
 
-        return duplicates
+        return file_sets
 
     @staticmethod
     def _check_file_health(file_path):
-        """Check if the file exists and is not empty, and has read permission."""
-        return os.path.exists(file_path) and os.path.getsize(file_path) > 0 and os.access(file_path, os.R_OK)
+        """Check if the file exists and is not empty."""
+        return os.path.exists(file_path) and os.path.getsize(file_path) > 0
+
