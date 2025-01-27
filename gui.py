@@ -1,117 +1,81 @@
-import os
-import tkinter as tk
-from tkinter import filedialog, ttk
+import wx
 from duplicate_finder import DuplicateFinder
+import os
 
 
-def select_folder():
-    return filedialog.askdirectory(title="Select a Folder")
+class DuplicateFinderFrame(wx.Frame):
+    def __init__(self, parent, title, folder_selected):
+        super().__init__(parent, title=title, size=(800, 600))
+        self.folder_selected = folder_selected
+        self.current_set = 0
+        self.click_count = {}
 
+        panel = wx.Panel(self)
+        vbox = wx.BoxSizer(wx.VERTICAL)
 
-def show_duplicate_files(folder_selected):
-    root = tk.Tk()
-    root.title("Duplicate Files")
-    root.geometry("800x600")
-    root.configure(bg="#2e2e2e")
-    root.eval('tk::PlaceWindow . center')  # Center the window
+        self.status_label = wx.StaticText(panel, label="Duplicate sets remaining: ")
+        vbox.Add(self.status_label, flag=wx.ALL | wx.EXPAND, border=10)
 
-    style = ttk.Style()
-    style.configure("Treeview.Heading", foreground="white", background="#2e2e2e", font=("Arial", 14, "bold"))
+        self.tree = wx.TreeCtrl(panel)
+        self.tree.Bind(wx.EVT_TREE_ITEM_ACTIVATED, self.on_double_click)
+        vbox.Add(self.tree, proportion=1, flag=wx.EXPAND | wx.ALL, border=10)
 
-    label = ttk.Label(root, text="Duplicate files will be displayed here", font=("Arial", 15), foreground="white",
-                      background="#2e2e2e")
-    label.pack(pady=10)
+        button_panel = wx.Panel(panel)
+        button_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.skip_button = wx.Button(button_panel, label="Skip")
+        self.skip_button.Bind(wx.EVT_BUTTON, self.skip_current_set)
+        button_sizer.Add(self.skip_button, flag=wx.RIGHT, border=10)
 
-    progress_bar = ttk.Progressbar(root, length=500)
-    progress_bar.pack(pady=10)
-    progress_label_var = tk.StringVar()
-    progress_label = ttk.Label(root, textvariable=progress_label_var, font=("Arial", 12), foreground="white",
-                               background="#2e2e2e")
-    progress_label.pack()
+        self.exit_button = wx.Button(button_panel, label="Exit")
+        self.exit_button.Bind(wx.EVT_BUTTON, self.exit_program)
+        button_sizer.Add(self.exit_button, flag=wx.RIGHT, border=10)
+        button_panel.SetSizer(button_sizer)
 
-    tree = ttk.Treeview(root, columns=("path",), show="headings", height=15)
-    tree.heading("path", text="File Path")
-    tree.column("path", width=750, anchor="w")
-    tree.pack(padx=20, pady=10, expand=True, fill="both")
+        vbox.Add(button_panel, flag=wx.ALL | wx.EXPAND, border=10)
+        panel.SetSizer(vbox)
+        self.Show()
+        self.run_find_duplicates()
 
-    label_var = tk.StringVar()
-    status_label = ttk.Label(root, textvariable=label_var, font=("Arial", 15), foreground="white", background="#2e2e2e")
-    status_label.pack(pady=10)
+    def run_find_duplicates(self):
+        finder = DuplicateFinder(self.folder_selected, None, None)
+        self.duplicate_list = list(finder.find_duplicates().values())
+        self.show_next_set()
 
-    duplicate_list = []
-    current_set = 0
-    delete_count = {}
+    def show_next_set(self):
+        self.tree.DeleteAllItems()
+        root = self.tree.AddRoot("Duplicate Files")
 
-    def show_next_set():
-        """Display the next set of duplicate files."""
-        nonlocal duplicate_list, current_set, label_var
-        if current_set < len(duplicate_list):
-            tree.delete(*tree.get_children())
-            for idx, file in enumerate(duplicate_list[current_set]):
-                color = "#ff5555" if idx % 2 == 0 else "#ff9966"
-                tree.insert("", "end", values=(file,), tags=(color,))
-                tree.tag_configure(color, foreground=color)
-            label_var.set(f"Duplicate sets remaining: {len(duplicate_list) - current_set}")
+        if self.current_set < len(self.duplicate_list):
+            for file in self.duplicate_list[self.current_set]:
+                self.tree.AppendItem(root, file)
+            self.tree.Expand(root)  # This line ensures the items are expanded
+            self.current_set += 1
+            self.status_label.SetLabel(f"Duplicate sets remaining: {len(self.duplicate_list) - self.current_set}")
         else:
-            label_var.set("No more duplicates. Review completed.")
+            self.status_label.SetLabel("No more duplicates. Review completed.")
 
-    def on_double_click(event):
-        """Delete file on double-click."""
-        nonlocal duplicate_list, current_set, delete_count
-        selected_item = tree.selection()
-        if selected_item:
-            file_to_delete = tree.item(selected_item, "values")[0]
-            if file_to_delete in delete_count:
-                delete_count[file_to_delete] += 1
-            else:
-                delete_count[file_to_delete] = 1
+    def skip_current_set(self, event):
+        self.show_next_set()
 
-            if delete_count[file_to_delete] >= 2:
-                os.remove(file_to_delete)
-                tree.delete(selected_item)
-                if len(tree.get_children()) == 1:
-                    show_next_set()
-            else:
-                label_var.set("Click the file twice to confirm deletion.")
+    def exit_program(self, event):
+        self.Close()
 
-    tree.bind("<Double-1>", on_double_click)
+    def on_double_click(self, event):
+        item = self.tree.GetSelection()
+        file_path = self.tree.GetItemText(item)
 
-    def run_find_duplicates():
-        """Run duplicate file finder."""
-        nonlocal duplicate_list, current_set
-        finder = DuplicateFinder(folder_selected, progress_bar, progress_label_var)
-        duplicate_groups = finder.find_duplicates()
-        duplicate_list = list(duplicate_groups.values())
-
-        if duplicate_list:
-            label_var.set(f"Duplicate sets found: {len(duplicate_list)}")
-            current_set = 0
-            show_next_set()
+        if file_path not in self.click_count:
+            self.click_count[file_path] = 1
         else:
-            label_var.set("No duplicate files found.")
+            self.click_count[file_path] += 1
 
-    def skip_current_set():
-        """Skip the current set of duplicates."""
-        nonlocal current_set
-        if current_set < len(duplicate_list):
-            current_set += 1
-            show_next_set()
+        if self.click_count[file_path] == 2:
+            self.delete_file(file_path)
 
-    def exit_program():
-        """Safely exit the application."""
-        root.quit()
-
-    skip_button = ttk.Button(root, text="Skip", command=skip_current_set, width=20)
-    skip_button.pack(pady=5)
-
-    exit_button = ttk.Button(root, text="Exit", command=exit_program, width=20)
-    exit_button.pack(pady=5)
-
-    root.after(0, run_find_duplicates)
-    root.mainloop()
-
-
-if __name__ == "__main__":
-    folder_selected = select_folder()
-    if folder_selected:
-        show_duplicate_files(folder_selected)
+    def delete_file(self, file_path):
+        try:
+            os.remove(file_path)
+            wx.MessageBox(f"File Deleted: {file_path}", "Info", wx.OK | wx.ICON_INFORMATION)
+            self.show_next_set()  # Move to the next set after deletion
+        except Exception as e:
+            wx.MessageBox(f"Error Deleting File: {file_path}\n{str(e)}", "Error", wx.OK | wx.ICON_ERROR)
