@@ -1,5 +1,6 @@
 import os
 import hashlib
+import wx
 
 
 class FileFinder:
@@ -21,9 +22,8 @@ class FileFinder:
             return None
 
     def find_files(self):
-        """Find files by comparing file hashes."""
+        """فایل‌های تکراری را در گروه‌های جداگانه پیدا می‌کند."""
         file_hashes = {}
-        file_sets = {}
         total_files = sum([len(files) for _, _, files in os.walk(self.folder_path)])
         processed_files = 0
 
@@ -31,26 +31,23 @@ class FileFinder:
             for file in files:
                 file_path = os.path.join(root, file)
                 if not self._check_file_health(file_path):
-                    continue  # Skip files that are empty or invalid
+                    continue  # رد کردن فایل‌های خراب یا خالی
 
                 file_hash = self._hash_file(file_path)
                 if file_hash:
-                    if file_hash in file_hashes:
-                        file_sets.setdefault(file_hash, [file_hashes[file_hash]]).append(file_path)
-                    else:
-                        file_hashes[file_hash] = file_path
+                    file_hashes.setdefault(file_hash, []).append(file_path)
 
-                # Update progress bar
+                # آپدیت نوار پیشرفت
                 processed_files += 1
                 if self.progress_bar:
                     progress_percentage = int((processed_files / total_files) * 100)
-                    self.progress_bar.SetValue(progress_percentage)
-                    self.progress_label.SetLabel(f"Progress: {progress_percentage}%")
+                    wx.CallAfter(self.progress_bar.SetValue, progress_percentage)
+                    wx.CallAfter(self.progress_label.SetLabel, f"Progress: {progress_percentage}%")
 
-        return file_sets
+        # برگرداندن گروه‌های فایل‌های تکراری
+        return [group for group in file_hashes.values() if len(group) > 1]
 
     @staticmethod
     def _check_file_health(file_path):
-        """Check if the file exists and is not empty."""
+        """Check if the file exists, is not empty, and is not a system file."""
         return os.path.exists(file_path) and os.path.getsize(file_path) > 0
-

@@ -7,48 +7,65 @@ class FileHandler:
         self.folder_selected = folder_selected
         self.current_set = 0
         self.selected_files = []  # Store selected files
-        self.file_sets = []  # List of files
+        self.file_sets = []  # List of file sets
         self.load_files()
 
     def load_files(self):
-        files = []  # یا هر ساختار داده دیگری که برای ذخیره مسیرهای فایل نیاز داری
+        """Load files and group them by hash using FileFinder."""
+        finder = FileFinder(self.folder_selected)
+        self.file_sets = finder.find_files()
+        return self.file_sets  # Ensure this returns the grouped files
+
+    def find_files(self):
+        """ Loads files from the selected folder and groups them into sets if needed. """
+        files = []
         try:
-            # Logic برای بارگذاری فایل‌ها (برای مثال استفاده از os یا glob)
-            # اینجا باید کدهای مربوط به جستجوی فایل‌ها قرار بگیرند
-            for root, dirs, filenames in os.walk(self.folder_selected):
+            for root, _, filenames in os.walk(self.folder_selected):
                 for filename in filenames:
                     full_path = os.path.join(root, filename)
-                    files.append(full_path)  # اضافه کردن مسیر فایل به لیست
-            return files
+                    files.append(full_path)
+
+            # If needed, group files into sets (e.g., by duplicates)
+            if files:
+                self.file_sets = [files]  # Modify this logic based on how sets should be structured
+
         except Exception as e:
             print(f"Error loading files: {str(e)}")
-            return None  # در صورت بروز خطا
 
     def delete_selected_files(self):
+        """ Deletes selected files and updates the file list. """
         for file in self.selected_files:
             try:
                 os.remove(file)
-                print(f"File ---------->  {file}  -----------> Deleted")
+                print(f"Deleted: {file}")
             except Exception as e:
-                print(f"Error Deleting File: {file}\n{str(e)}")
+                print(f"Error deleting {file}: {str(e)}")
+
         self.selected_files.clear()
+        self.load_files()  # Reload files after deletion
 
     def on_item_activated(self, file_path):
-        if file_path not in self.selected_files:
-            self.selected_files.append(file_path)
+        """ سلکت یا دیسلکت کردن فایل با فشردن کلید """
+        if file_path in self.selected_files:
+            self.selected_files.remove(file_path)  # اگر از قبل انتخاب شده، حذف کن
+            print(f"File deselected: {file_path}")
         else:
-            self.selected_files.remove(file_path)
+            self.selected_files.append(file_path)  # در غیر این صورت اضافه کن
+            print(f"File selected: {file_path}")
 
     def update_selected_count(self):
+        """ Returns the number of selected files. """
         return len(self.selected_files)
-
     def next_set(self):
+        """ Moves to the next set of files if available. """
         if self.current_set < len(self.file_sets) - 1:
             self.current_set += 1
 
     def back_to_previous_set(self):
+        """ Moves back to the previous file set if possible. """
         if self.current_set > 0:
             self.current_set -= 1
 
     def get_current_set_files(self):
+        """ Returns the current set of files. """
         return self.file_sets[self.current_set] if self.file_sets else []
