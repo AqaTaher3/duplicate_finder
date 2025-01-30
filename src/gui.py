@@ -11,9 +11,9 @@ class FileFinderFrame(wx.Frame):
         self.file_handler = file_handler
         self.current_set = 0
         self.files_list = self.file_handler.load_files() or []
-        self.selected_files = []  # لیست فایل‌های انتخاب‌شده
+        self.selected_files = []  # لیست جهانی برای فایل‌های انتخاب‌شده
 
-        # ایجاد GUI با تم تیره
+        # ایجاد GUI
         self.SetBackgroundColour(wx.Colour(30, 30, 30))
         self.panel = wx.Panel(self)
         self.panel.SetBackgroundColour(wx.Colour(50, 50, 50))
@@ -27,7 +27,14 @@ class FileFinderFrame(wx.Frame):
         # لیست فایل‌ها در `wx.ListCtrl`
         self.file_list_ctrl = wx.ListCtrl(self.panel, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
         self.file_list_ctrl.InsertColumn(0, "File Paths", width=700)
+
+        # غیرفعال کردن رویدادهای موس
         self.file_list_ctrl.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_item_selected)
+        self.file_list_ctrl.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.on_item_deselected)
+
+        # مدیریت رویدادهای کیبورد
+        self.file_list_ctrl.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
+
         self.vbox.Add(self.file_list_ctrl, 1, wx.ALL | wx.EXPAND, 10)
 
         # دکمه‌ها
@@ -62,33 +69,37 @@ class FileFinderFrame(wx.Frame):
         self.selected_count_label.SetLabel(f"Selected files: {len(self.selected_files)}")
 
     def show_current_set(self):
-        """یک گروه از فایل‌های تکراری را نمایش می‌دهد."""
+        """نمایش گروه فعلی فایل‌ها"""
         self.file_list_ctrl.DeleteAllItems()
         if self.files_list and 0 <= self.current_set < len(self.files_list):
             file_group = self.files_list[self.current_set]
             for file_path in file_group:
                 index = self.file_list_ctrl.InsertItem(self.file_list_ctrl.GetItemCount(), file_path)
                 if file_path in self.selected_files:
-                    self.file_list_ctrl.SetItemBackgroundColour(index, wx.Colour(0, 0, 255))  # رنگ آبی برای انتخاب‌شده‌ها
+                    self.file_list_ctrl.SetItemBackgroundColour(index, wx.Colour(0, 0,
+                                                                                 255))  # رنگ آبی برای فایل‌های انتخاب‌شده
             self.status_label.SetLabel(f"Files remaining: {len(self.files_list) - self.current_set}")
         else:
             index = self.file_list_ctrl.InsertItem(0, "No more duplicate files found.")
             self.file_list_ctrl.SetItemBackgroundColour(index, wx.Colour(100, 100, 100))
 
+        # به‌روزرسانی تعداد فایل‌های انتخاب‌شده
+        self.update_selected_count()
+
     def next_set(self, event):
-        """نمایش گروه بعدی فایل‌های تکراری."""
+        """نمایش گروه بعدی فایل‌ها"""
         if self.current_set < len(self.files_list) - 1:
             self.current_set += 1
             self.show_current_set()
 
     def back_to_previous_set(self, event):
-        """نمایش گروه قبلی فایل‌های تکراری."""
+        """نمایش گروه قبلی فایل‌ها"""
         if self.current_set > 0:
             self.current_set -= 1
             self.show_current_set()
 
     def delete_selected_files(self, event):
-        """حذف فایل‌های انتخاب‌شده."""
+        """حذف فایل‌های انتخاب‌شده"""
         if not self.selected_files:
             return
 
@@ -98,20 +109,37 @@ class FileFinderFrame(wx.Frame):
             except Exception as e:
                 print(f"خطا در حذف فایل {file_path}: {e}")
 
+        # پاک کردن لیست فایل‌های انتخاب‌شده پس از حذف
         self.selected_files = []
         self.files_list = self.file_handler.load_files()
         self.show_current_set()
 
     def on_item_selected(self, event):
-        """مدیریت انتخاب فایل‌ها در `wx.ListCtrl`"""
-        index = event.GetIndex()
-        item_text = self.file_list_ctrl.GetItemText(index)
+        """مدیریت انتخاب فایل‌ها با موس (غیرفعال شده)"""
+        event.Skip()  # جلوگیری از انتخاب با موس
 
-        if item_text in self.selected_files:
-            self.selected_files.remove(item_text)
-            self.file_list_ctrl.SetItemBackgroundColour(index, wx.Colour(70, 70, 70))  # رنگ اصلی
-        else:
-            self.selected_files.append(item_text)
-            self.file_list_ctrl.SetItemBackgroundColour(index, wx.Colour(0, 0, 255))  # رنگ آبی برای انتخاب‌شده‌ها
+    def on_item_deselected(self, event):
+        """مدیریت لغو انتخاب فایل‌ها با موس (غیرفعال شده)"""
+        event.Skip()  # جلوگیری از لغو انتخاب با موس
 
-        self.update_selected_count()
+    def on_key_down(self, event):
+        """مدیریت رویدادهای کیبورد"""
+        key_code = event.GetKeyCode()
+        selected_item = self.file_list_ctrl.GetFirstSelected()
+
+        if selected_item != -1:
+            file_path = self.file_list_ctrl.GetItemText(selected_item)
+
+            if key_code == wx.WXK_SPACE:  # انتخاب با دکمه Space
+                if file_path not in self.selected_files:
+                    self.selected_files.append(file_path)
+                    self.file_list_ctrl.SetItemBackgroundColour(selected_item, wx.Colour(0, 0, 255))  # رنگ آبی
+                    self.update_selected_count()
+
+            elif key_code == wx.WXK_ALT:  # لغو انتخاب با دکمه Alt
+                if file_path in self.selected_files:
+                    self.selected_files.remove(file_path)
+                    self.file_list_ctrl.SetItemBackgroundColour(selected_item, wx.Colour(70, 70, 70))  # رنگ اصلی
+                    self.update_selected_count()
+
+        event.Skip()
