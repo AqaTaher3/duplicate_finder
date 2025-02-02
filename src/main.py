@@ -2,6 +2,9 @@ import wx
 from gui import FileFinderFrame
 from logic import FileHandler
 
+# adress ta jaye moshtarak neshoon nade
+# tooye list bar asase data modify ya data create moratab beshe
+
 
 def main():
     app = wx.App(False)

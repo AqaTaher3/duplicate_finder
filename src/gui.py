@@ -1,43 +1,46 @@
 import wx
 from logic import FileHandler
 import os
+import datetime
 
 
 class FileFinderFrame(wx.Frame):
     def __init__(self, parent, title, folder_path, file_handler):
-        super().__init__(parent, title=title, size=(800, 400))
+        super().__init__(parent, title=title, size=(1000, 450))  # ارتفاع کاهش یافته
 
         self.folder_path = folder_path
         self.file_handler = file_handler
-        self.current_set = 0
-        self.files_list = self.file_handler.load_files() or []
-        self.selected_files = []  # لیست جهانی برای فایل‌های انتخاب‌شده
+        self.current_set = 0  # برای پیگیری گروه فعلی
+        self.files_list = []  # مقداردهی اولیه لیست گروه‌های تکراری
+        self.selected_files = []  # لیست فایل‌های انتخاب‌شده
 
-        # ایجاد GUI
-        self.SetBackgroundColour(wx.Colour(30, 30, 30))
+        # دریافت گروه‌های فایل‌های تکراری
+        self.files_list = self.file_handler.load_files() or []
+
+        # ایجاد GUI با تم تیره
+        self.SetBackgroundColour(wx.Colour(43, 58, 68))  # آبی تیره (Dark Blue)
         self.panel = wx.Panel(self)
-        self.panel.SetBackgroundColour(wx.Colour(50, 50, 50))
+        self.panel.SetBackgroundColour(wx.Colour(43, 69, 60))  # سبز تیره (Dark Green)
         self.vbox = wx.BoxSizer(wx.VERTICAL)
 
         # برچسب وضعیت
-        self.status_label = wx.StaticText(self.panel, label="Files remaining:")
-        self.status_label.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.status_label = wx.StaticText(self.panel, label="Files remai ning:")
+        self.status_label.SetForegroundColour(wx.Colour(230, 210, 181))  # متن کرم باقی مانده
         self.vbox.Add(self.status_label, 0, wx.ALL | wx.CENTER, 10)
 
-        # لیست فایل‌ها در `wx.ListCtrl`
-        self.file_list_ctrl = wx.ListCtrl(self.panel, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
-        self.file_list_ctrl.InsertColumn(0, "File Paths", width=700)
+        # لیست فایل‌ها
+        self.file_paths_ctrl = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY, size=(700, 200))
+        self.file_paths_ctrl.Bind(wx.EVT_KEY_DOWN, self.on_key_press)  # استفاده از on_key_press
+        self.file_paths_ctrl.SetBackgroundColour(wx.Colour(43, 58, 68))  # آبی تیره (Dark Blue)
+        self.file_paths_ctrl.SetForegroundColour(wx.Colour(230, 210, 181))  # متن سفید
 
-        # غیرفعال کردن رویدادهای موس
-        self.file_list_ctrl.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_item_selected)
-        self.file_list_ctrl.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.on_item_deselected)
+        # تنظیم فونت بزرگ‌تر
+        font = wx.Font(20, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        self.file_paths_ctrl.SetFont(font)
 
-        # مدیریت رویدادهای کیبورد
-        self.file_list_ctrl.Bind(wx.EVT_KEY_DOWN, self.on_key_down)
+        self.vbox.Add(self.file_paths_ctrl, 1, wx.ALL | wx.EXPAND, 10)
 
-        self.vbox.Add(self.file_list_ctrl, 1, wx.ALL | wx.EXPAND, 10)
-
-        # دکمه‌ها
+        # دکمه‌ها در یک ردیف
         self.button_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         self.btn_prev = wx.Button(self.panel, label="Back")
@@ -54,34 +57,64 @@ class FileFinderFrame(wx.Frame):
 
         self.vbox.Add(self.button_sizer, 0, wx.ALL | wx.CENTER, 10)
 
-        # نمایش تعداد فایل‌های انتخاب‌شده
+        # نوار وضعیت پایین پنجره
         self.selected_count_label = wx.StaticText(self.panel, label="Selected files: 0")
-        self.selected_count_label.SetForegroundColour(wx.Colour(255, 255, 255))
+        self.selected_count_label.SetForegroundColour(wx.Colour(230, 210, 181))  # متن سفید
         self.vbox.Add(self.selected_count_label, 0, wx.ALL | wx.CENTER, 10)
 
         self.panel.SetSizer(self.vbox)
 
-        # نمایش اولین گروه فایل‌ها
+        # نمایش گروه اول فایل‌های تکراری
         self.show_current_set()
 
     def update_selected_count(self):
         """به‌روزرسانی تعداد فایل‌های انتخاب‌شده"""
         self.selected_count_label.SetLabel(f"Selected files: {len(self.selected_files)}")
 
+    import os
+    import datetime
+
+    import os
+    import datetime
+
     def show_current_set(self):
-        """نمایش گروه فعلی فایل‌ها"""
-        self.file_list_ctrl.DeleteAllItems()
+        """نمایش گروه فعلی فایل‌ها با مسیر نسبی و نمایش Data Modified یا در صورت نبود، Data Created"""
+        self.file_paths_ctrl.Clear()
         if self.files_list and 0 <= self.current_set < len(self.files_list):
             file_group = self.files_list[self.current_set]
-            for file_path in file_group:
-                index = self.file_list_ctrl.InsertItem(self.file_list_ctrl.GetItemCount(), file_path)
-                if file_path in self.selected_files:
-                    self.file_list_ctrl.SetItemBackgroundColour(index, wx.Colour(0, 0,
-                                                                                 255))  # رنگ آبی برای فایل‌های انتخاب‌شده
+
+            file_info_list = []  # لیست فایل‌ها همراه با تاریخ‌ها
+
+            for file in file_group:
+                # تبدیل مسیر به مسیر نسبی
+                relative_path = os.path.relpath(file, self.folder_path)
+
+                try:
+                    # دریافت زمان آخرین تغییر (modified time)
+                    modified_time = os.path.getmtime(file)
+                    modified_date = datetime.datetime.fromtimestamp(modified_time).strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    modified_date = None  # در صورت خطا، مقدار None بماند
+
+                try:
+                    # دریافت زمان ایجاد (created time)
+                    created_time = os.path.getctime(file)
+                    created_date = datetime.datetime.fromtimestamp(created_time).strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    created_date = None  # در صورت خطا، مقدار None بماند
+
+                # اگر Modified وجود نداشت، Created را جایگزین کن
+                file_date = modified_date if modified_date else created_date if created_date else "N/A"
+
+                # اضافه کردن به لیست نمایش
+                file_info_list.append(f"{relative_path}   |   {file_date}")
+
+            # نمایش مسیر و تاریخ در GUI
+            file_paths = "\n".join(file_info_list)
+            self.file_paths_ctrl.SetValue(file_paths)
             self.status_label.SetLabel(f"Files remaining: {len(self.files_list) - self.current_set}")
         else:
-            index = self.file_list_ctrl.InsertItem(0, "No more duplicate files found.")
-            self.file_list_ctrl.SetItemBackgroundColour(index, wx.Colour(100, 100, 100))
+            self.file_paths_ctrl.SetValue("No more duplicate files found.")
 
         # به‌روزرسانی تعداد فایل‌های انتخاب‌شده
         self.update_selected_count()
@@ -105,41 +138,47 @@ class FileFinderFrame(wx.Frame):
 
         for file_path in self.selected_files:
             try:
-                os.remove(file_path)
+                # تبدیل مسیر نسبی به مسیر مطلق
+                absolute_path = os.path.join(self.folder_path, file_path)
+
+                if os.path.exists(absolute_path):
+                    os.remove(absolute_path)
+                    print(f"Deleted: {absolute_path}")
+                else:
+                    print(f"⚠️ File not found: {absolute_path}")
+
             except Exception as e:
-                print(f"خطا در حذف فایل {file_path}: {e}")
+                print(f"خطا در حذف فایل {absolute_path}: {e}")
 
         # پاک کردن لیست فایل‌های انتخاب‌شده پس از حذف
         self.selected_files = []
         self.files_list = self.file_handler.load_files()
         self.show_current_set()
 
-    def on_item_selected(self, event):
-        """مدیریت انتخاب فایل‌ها با موس (غیرفعال شده)"""
-        event.Skip()  # جلوگیری از انتخاب با موس
+        # پاک کردن لیست فایل‌های انتخاب‌شده پس از حذف
+        self.selected_files = []
+        self.files_list = self.file_handler.load_files()
+        self.show_current_set()
 
-    def on_item_deselected(self, event):
-        """مدیریت لغو انتخاب فایل‌ها با موس (غیرفعال شده)"""
-        event.Skip()  # جلوگیری از لغو انتخاب با موس
-
-    def on_key_down(self, event):
+    def on_key_press(self, event):
         """مدیریت رویدادهای کیبورد"""
         key_code = event.GetKeyCode()
-        selected_item = self.file_list_ctrl.GetFirstSelected()
+        cursor_pos = self.file_paths_ctrl.GetInsertionPoint()  # موقعیت کرسر
+        line_start = self.file_paths_ctrl.GetRange(0, cursor_pos).rfind("\n") + 1  # ابتدای خط
+        line_end = self.file_paths_ctrl.GetValue().find("\n", cursor_pos)  # انتهای خط
+        if line_end == -1:
+            line_end = len(self.file_paths_ctrl.GetValue())  # اگر خط آخر باشد
 
-        if selected_item != -1:
-            file_path = self.file_list_ctrl.GetItemText(selected_item)
+        selected_text = self.file_paths_ctrl.GetRange(line_start, line_end)  # متن خط انتخاب‌شده
 
-            if key_code == wx.WXK_SPACE:  # انتخاب با دکمه Space
-                if file_path not in self.selected_files:
-                    self.selected_files.append(file_path)
-                    self.file_list_ctrl.SetItemBackgroundColour(selected_item, wx.Colour(0, 0, 255))  # رنگ آبی
+        if selected_text:  # اگر کاربر چیزی انتخاب کرده باشد
+            if key_code == wx.WXK_SPACE:  # دکمه Space برای انتخاب
+                if selected_text not in self.selected_files:
+                    self.selected_files.append(selected_text)
+                    self.update_selected_count()
+            elif key_code == wx.WXK_ALT:  # دکمه Alt برای دیسلکت
+                if selected_text in self.selected_files:
+                    self.selected_files.remove(selected_text)
                     self.update_selected_count()
 
-            elif key_code == wx.WXK_ALT:  # لغو انتخاب با دکمه Alt
-                if file_path in self.selected_files:
-                    self.selected_files.remove(file_path)
-                    self.file_list_ctrl.SetItemBackgroundColour(selected_item, wx.Colour(70, 70, 70))  # رنگ اصلی
-                    self.update_selected_count()
-
-        event.Skip()
+        event.Skip()  # ادامه پردازش رویدادهای دیگر
