@@ -1,10 +1,7 @@
 import wx
 from gui import FileFinderFrame
 from logic import FileHandler
-
-# adress ta jaye moshtarak neshoon nade
-# tooye list bar asase data modify ya data create moratab beshe
-
+from finder import FileFinder
 
 def main():
     app = wx.App(False)
@@ -15,21 +12,16 @@ def main():
     else:
         folder_selected = None
 
-    dialog.Destroy()  # Ensure the dialog is always destroyed
+    dialog.Destroy()
 
     if folder_selected:
-        # Create handler instance to handle the file logic
         handler = FileHandler(folder_selected)
-
-        # Create the GUI frame and pass the handler instance along with folder
         frame = FileFinderFrame(None, "File Finder", folder_selected, handler)
         frame.Show()
-
-        # Start the GUI event loop
         app.MainLoop()
     else:
         wx.MessageBox("No folder selected, exiting application.", "Error", wx.OK | wx.ICON_ERROR)
 
-
 if __name__ == "__main__":
     main()
+
