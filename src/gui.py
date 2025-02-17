@@ -116,17 +116,26 @@ class FileFinderFrame(wx.Frame):
         selected_text = self.file_paths_ctrl.GetRange(line_start, line_end)
 
         if selected_text:
-            if key_code == wx.WXK_SPACE:
-                if selected_text not in self.selected_files:
-                    self.selected_files.append(selected_text)
-                    self.update_selected_count()
-            elif key_code == wx.WXK_ALT:
-                if selected_text in self.selected_files:
-                    self.selected_files.remove(selected_text)
-                    self.update_selected_count()
+            # استخراج مسیر فایل از متن انتخاب شده
+            file_path = selected_text.split("   |   ")[0].strip()
+
+            # تبدیل مسیر نسبی به مطلق
+            absolute_path = os.path.join(self.folder_path, file_path)
+
+            # بررسی وجود فایل قبل از اضافه کردن به لیست
+            if os.path.exists(absolute_path):
+                if key_code == wx.WXK_SPACE:
+                    if absolute_path not in self.selected_files:
+                        self.selected_files.append(absolute_path)
+                        self.update_selected_count()
+                elif key_code == wx.WXK_ALT:
+                    if absolute_path in self.selected_files:
+                        self.selected_files.remove(absolute_path)
+                        self.update_selected_count()
+            else:
+                print(f"⚠️ File not found: {absolute_path}")
 
         event.Skip()
-
     def on_delete_selected(self, event):
         if not self.selected_files:
             return

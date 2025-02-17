@@ -19,15 +19,15 @@ class FileHandler:
     def delete_selected_files(self, selected_files):
         """Deletes selected files and updates the file list."""
         for file in selected_files:
+            print(f"Checking: {file}")  # چاپ مسیر فایل برای بررسی
             try:
-                absolute_path = os.path.abspath(file)  # اطمینان از مسیر کامل
-                if os.path.exists(absolute_path):
-                    os.remove(absolute_path)
-                    print(f"Deleted: {absolute_path}")
+                if os.path.exists(file):
+                    os.remove(file)
+                    print(f"Deleted: {file}")
                 else:
-                    print(f"⚠️ File not found: {absolute_path}")
+                    print(f"⚠️ File not found: {file}")
             except Exception as e:
-                print(f"Error deleting {absolute_path}: {e}")
+                print(f"Error deleting {file}: {e}")
 
         self.load_files()  # بارگذاری مجدد لیست
 
