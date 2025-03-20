@@ -11,5 +11,5 @@ def delete_empty_folders(directory):
                 print(f"Could not delete {foldername}: {e}")
 
 # مسیر موردنظر را اینجا بده
-path = r"C:\Users\HP\Music\00_Books\ttttazeeeee\11111"
+path = r"C:\Users\HP\Calibre Library\000_PriorityFolder"
 delete_empty_folders(path)

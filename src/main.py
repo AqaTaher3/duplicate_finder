@@ -15,7 +15,7 @@ def main():
     dialog.Destroy()
 
     if folder_selected:
-        handler = FileHandler(folder_selected)
+        handler = FileHandler(folder_selected, priority_folder_name="000_PriorityFolder")  # تغییر اسم فولدر
         frame = FileFinderFrame(None, "File Finder", folder_selected, handler)
         frame.Show()
         app.MainLoop()
@@ -24,4 +24,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
