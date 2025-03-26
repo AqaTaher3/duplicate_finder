@@ -10,6 +10,5 @@ def delete_empty_folders(directory):
             except OSError as e:
                 print(f"Could not delete {foldername}: {e}")
 
-# مسیر موردنظر را اینجا بده
-path = r"C:\Users\HP\Calibre Library\000_PriorityFolder"
-delete_empty_folders(path)
+di = r"D:\012_Library\000_PriorityFolder"
+delete_empty_folders(di)

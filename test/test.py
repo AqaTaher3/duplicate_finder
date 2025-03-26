@@ -1,7 +1,7 @@
 import wx
-from gui import FileFinderFrame
-from logic import FileHandler
-from finder import FileFinder
+from src.gui import FileFinderFrame
+from src.logic import FileHandler
+from src.finder import FileFinder
 import os
 import hashlib
 import wx
