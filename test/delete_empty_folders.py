@@ -1,8 +1,25 @@
 import os
 
+
 def delete_empty_folders(directory):
+    print(f"Checking directory: {directory}")
+    if not os.path.exists(directory):
+        print("Directory does not exist!")
+        return
+
+    # First check if the main directory is empty
+    if not os.listdir(directory):
+        try:
+            os.rmdir(directory)
+            print(f"Deleted empty folder: {directory}")
+        except OSError as e:
+            print(f"Could not delete {directory}: {e}")
+
+    # Now check for empty subfolders
     for foldername, subfolders, filenames in os.walk(directory, topdown=False):
-        # اگر فولدر هیچ فایل و زیرپوشه‌ای نداشته باشد، حذفش کن
+        print(f"Checking folder: {foldername}")
+        print(f"Subfolders: {subfolders}")
+        print(f"Files: {filenames}")
         if not subfolders and not filenames:
             try:
                 os.rmdir(foldername)
@@ -10,5 +27,6 @@ def delete_empty_folders(directory):
             except OSError as e:
                 print(f"Could not delete {foldername}: {e}")
 
-di = r"D:\012_Library\000_PriorityFolder"
-delete_empty_folders(di)
+
+dire = r"C:\Users\HP\Calibre Library\000_PriorityFolder"
+delete_empty_folders(dire)

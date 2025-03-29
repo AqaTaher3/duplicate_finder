@@ -12,47 +12,52 @@ class FileHandler:
         self.file_sets = []
         self.load_files()
 
-    def load_files(self):
+    def load_files(self, prioritize_old=False):
         """Load and group files using FileFinder, then auto-delete based on priorities."""
         finder = FileFinder(self.folder_selected)
         self.file_sets = finder.find_files()
 
-        # بررسی و حذف خودکار فایل‌ها
         updated_file_sets = []
         for file_group in self.file_sets:
-            if len(file_group) > 1:  # فقط گروه‌های تکراری رو بررسی کن
-                priority_files = []  # فایل‌هایی که توی 000_PriorityFolder هستن
-                non_priority_files = []  # فایل‌هایی که بیرون 000_PriorityFolder هستن
+            if len(file_group) > 1:
+                if prioritize_old:
+                    # مرتب‌سازی فایل‌ها بر اساس تاریخ تغییر (قدیمی‌ترها اول)
+                    files_with_mtime = [(f, os.path.getmtime(f)) for f in file_group if os.path.exists(f)]
+                    files_with_mtime.sort(key=lambda x: x[1])
 
-                # جدا کردن فایل‌های اولویت‌دار و غیراولویت‌دار
-                for file in file_group:
-                    if self.priority_folder in file:
-                        priority_files.append(file)
-                    else:
-                        non_priority_files.append(file)
-
-                if priority_files and non_priority_files:
-                    # اگه هم فایل اولویت‌دار داریم هم غیراولویت‌دار، اولویت‌دارها حذف بشن
-                    self.delete_selected_files(priority_files)
-                    updated_file_sets.append(non_priority_files)
-                elif priority_files and not non_priority_files:
-                    # اگه همه فایل‌ها توی 000_PriorityFolder هستن، بر اساس تاریخ تغییر حذف کن
-                    files_with_mtime = [(f, os.path.getmtime(f)) for f in priority_files if os.path.exists(f)]
-                    if files_with_mtime:
-                        # مرتب‌سازی بر اساس تاریخ تغییر (قدیمی‌ترها اول)
-                        files_with_mtime.sort(key=lambda x: x[1])
-                        # نگه داشتن جدیدترین فایل و حذف بقیه
-                        files_to_delete = [f[0] for f in files_with_mtime[:-1]]  # همه به جز جدیدترین
-                        if files_to_delete:
-                            self.delete_selected_files(files_to_delete)
-                        updated_file_sets.append([files_with_mtime[-1][0]])  # جدیدترین رو نگه دار
-                    else:
-                        updated_file_sets.append(file_group)  # اگه خطایی بود، گروه رو نگه دار
+                    # نگه داشتن جدیدترین فایل و حذف بقیه
+                    files_to_delete = [f[0] for f in files_with_mtime[:-1]]
+                    if files_to_delete:
+                        self.delete_selected_files(files_to_delete)
+                    updated_file_sets.append([files_with_mtime[-1][0]])
                 else:
-                    # اگه هیچ‌کدوم توی 000_PriorityFolder نبودن، گروه رو نگه دار
-                    updated_file_sets.append(file_group)
+                    # منطق قبلی برای اولویت‌دهی به فولدر 000_PriorityFolder
+                    priority_files = []
+                    non_priority_files = []
+
+                    for file in file_group:
+                        if self.priority_folder in file:
+                            priority_files.append(file)
+                        else:
+                            non_priority_files.append(file)
+
+                    if priority_files and non_priority_files:
+                        self.delete_selected_files(priority_files)
+                        updated_file_sets.append(non_priority_files)
+                    elif priority_files and not non_priority_files:
+                        files_with_mtime = [(f, os.path.getmtime(f)) for f in priority_files if os.path.exists(f)]
+                        if files_with_mtime:
+                            files_with_mtime.sort(key=lambda x: x[1])
+                            files_to_delete = [f[0] for f in files_with_mtime[:-1]]
+                            if files_to_delete:
+                                self.delete_selected_files(files_to_delete)
+                            updated_file_sets.append([files_with_mtime[-1][0]])
+                        else:
+                            updated_file_sets.append(file_group)
+                    else:
+                        updated_file_sets.append(file_group)
             else:
-                updated_file_sets.append(file_group)  # فایل‌های غیرتکراری رو نگه دار
+                updated_file_sets.append(file_group)
 
         self.file_sets = updated_file_sets
         return self.file_sets

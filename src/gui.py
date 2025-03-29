@@ -21,6 +21,7 @@ class FileFinderFrame(wx.Frame):
         self.vbox = wx.BoxSizer(wx.VERTICAL)
 
         self.status_label = wx.StaticText(self.panel, label="Files remaining:")
+        self.cb_priority_old = wx.CheckBox(self.panel, label="Delete older files first")
         self.status_label.SetForegroundColour(wx.Colour(230, 210, 181))
         self.vbox.Add(self.status_label, 0, wx.ALL | wx.CENTER, 10)
 
@@ -136,11 +137,26 @@ class FileFinderFrame(wx.Frame):
                 print(f"⚠️ File not found: {absolute_path}")
 
         event.Skip()
+
     def on_delete_selected(self, event):
         if not self.selected_files:
             return
 
-        self.file_handler.delete_selected_files(self.selected_files)  # فراخوانی تابع در منطق
+        # دریافت وضعیت چک‌باکس
+        prioritize_old = self.cb_priority_old.GetValue()
+
+        # اگر چک‌باکس فعال باشد، فایل‌های قدیمی‌تر را اول حذف کن
+        if prioritize_old:
+            # مرتب‌سازی فایل‌های انتخاب شده بر اساس تاریخ تغییر
+            files_with_mtime = [(f, os.path.getmtime(f)) for f in self.selected_files if os.path.exists(f)]
+            files_with_mtime.sort(key=lambda x: x[1])
+            files_to_delete = [f[0] for f in files_with_mtime]
+        else:
+            files_to_delete = self.selected_files
+
+        self.file_handler.delete_selected_files(files_to_delete)
         self.selected_files = []
-        self.files_list = self.file_handler.load_files()
+        self.files_list = self.file_handler.load_files(prioritize_old)
         self.show_current_set()
+
+
