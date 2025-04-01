@@ -4,6 +4,7 @@ from logic import FileHandler
 from src2.delete_empty_folders import delete_empty_folders
 import os
 
+
 def main():
     app = wx.App(False)
 

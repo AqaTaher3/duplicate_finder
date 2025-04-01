@@ -12,22 +12,17 @@ def check_file_integrity(file_path):
     return False
 
 
-def find_corrupted_files(directory):
+def corrupted_files(directory):
     corrupted_files = []
     for root, dirs, files in os.walk(directory):
         for file in files:
             file_path = os.path.join(root, file)
             if check_file_integrity(file_path):
+                print("corrupted file : ", file_path)
                 corrupted_files.append(file_path)
     return corrupted_files
 
 
-directory = r"C:\Users\G L S\Music\000_PriorityFolder\000_KHARAB"
-corrupted_files = find_corrupted_files(directory)
+dire = r"C:\Users\G L S\Music\000_PriorityFolder\000_KHARAB"
+corrupted_files(dire)
 
-if corrupted_files:
-    print("Corrupted files found:")
-    for file in corrupted_files:
-        print(file)
-else:
-    print("No corrupted files found.")
