@@ -1,7 +1,7 @@
 import wx
 from gui import FileFinderFrame
 from logic import FileHandler
-from test.delete_empty_folders import delete_empty_folders
+from src2.delete_empty_folders import delete_empty_folders
 import os
 
 def main():
