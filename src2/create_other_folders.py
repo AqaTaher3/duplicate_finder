@@ -9,3 +9,4 @@ def making_folders():
     corrupted_folder = r"D:\000_Music\000_corrupted_forlder"
     if not os.path.exists(corrupted_folder):
         os.makedirs(corrupted_folder, exist_ok=True)
+    return [priority_folder, corrupted_folder]

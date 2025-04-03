@@ -4,14 +4,11 @@ from logic import FileHandler
 from src2.delete_empty_folders import delete_empty_folders
 from src2.corrupted_files import move_corrupted_files
 from src2.create_other_folders import making_folders
-import os
 
 FFMPEG_PATH = r"D:\000_projects\librareis\ffmpeg\bin\ffmpeg.exe"
-finding_corrupted = False
 
-making_folders()
-corrupted_folder = r"D:\000_Music\000_corrupted_Files"
-priority_folder = r"D:\000_Music\000_PriorityFolder"
+# finding_corrupted_files_from_000_PriorityFolder
+finding_corrupted_files = False
 
 
 def main():
@@ -26,7 +23,8 @@ def main():
     dialog.Destroy()
 
     if folder_selected:
-        if finding_corrupted:
+        [priority_folder, corrupted_folder] = making_folders()
+        if finding_corrupted_files:
             move_corrupted_files(priority_folder, FFMPEG_PATH, corrupted_folder)
         handler = FileHandler(folder_selected, priority_folder_name="000_PriorityFolder")
         frame = FileFinderFrame(None, "File Finder", folder_selected, handler)
