@@ -1,12 +1,13 @@
 import os
 
 
-def making_folders():
-    priority_folder = r"D:\000_Music\000_PriorityFolder"
-    if not os.path.exists(priority_folder):
-        os.makedirs(priority_folder, exist_ok=True)
+def making_folders(folder_selected):
+    priority_folder = os.path.join(folder_selected, "000_PriorityFolder")
+    corrupted_folder = os.path.join(folder_selected, "000_corrupted_folder")
+    keep_folder = os.path.join(folder_selected, "000_keep_folder")
 
-    corrupted_folder = r"D:\000_Music\000_corrupted_forlder"
-    if not os.path.exists(corrupted_folder):
-        os.makedirs(corrupted_folder, exist_ok=True)
-    return [priority_folder, corrupted_folder]
+    os.makedirs(priority_folder, exist_ok=True)
+    os.makedirs(corrupted_folder, exist_ok=True)
+    os.makedirs(keep_folder, exist_ok=True)
+
+    return [keep_folder, priority_folder, corrupted_folder]

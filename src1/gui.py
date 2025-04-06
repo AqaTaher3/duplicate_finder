@@ -1,124 +1,147 @@
 import wx
-from src1.logic import FileHandler
 import os
-
-
+import datetime
 
 class FileFinderFrame(wx.Frame):
     def __init__(self, parent, title, folder_path, file_handler):
-        super().__init__(parent, title=title, size=(800, 600))  # اندازه پنجره کوچکتر شده
+        super().__init__(parent, title=title, size=(1000, 450))
+
         self.folder_path = folder_path
         self.file_handler = file_handler
+        self.current_set = 0
         self.files_list = []
         self.selected_files = []
 
-        self.init_ui()
-        self.load_files()
+        self.files_list = self.file_handler.load_files() or []
 
-    def init_ui(self):
         self.SetBackgroundColour(wx.Colour(43, 58, 68))
         self.panel = wx.Panel(self)
         self.panel.SetBackgroundColour(wx.Colour(43, 69, 60))
+        self.vbox = wx.BoxSizer(wx.VERTICAL)
 
-        # Main sizer
-        self.main_sizer = wx.BoxSizer(wx.VERTICAL)
+        self.status_label = wx.StaticText(self.panel, label="Files remaining:")
+        self.cb_priority_old = wx.CheckBox(self.panel, label="Delete older files first")
+        self.status_label.SetForegroundColour(wx.Colour(230, 210, 181))
+        self.vbox.Add(self.status_label, 0, wx.ALL | wx.CENTER, 10)
 
-        # اضافه کردن المان‌های جدید برای نمایش اطلاعات اسکن
-        self.scan_info_panel = wx.Panel(self.panel)
-        self.scan_info_panel.SetBackgroundColour(wx.Colour(60, 60, 60))
+        self.file_paths_ctrl = wx.TextCtrl(self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY, size=(700, 200))
+        self.file_paths_ctrl.Bind(wx.EVT_KEY_DOWN, self.on_key_press)
+        self.file_paths_ctrl.SetBackgroundColour(wx.Colour(43, 58, 68))
+        self.file_paths_ctrl.SetForegroundColour(wx.Colour(230, 210, 181))
 
-        self.scan_info_sizer = wx.BoxSizer(wx.VERTICAL)
+        font = wx.Font(20, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        self.file_paths_ctrl.SetFont(font)
 
-        self.total_files_label = wx.StaticText(self.scan_info_panel, label="Total files to scan: 0")
-        self.files_scanned_label = wx.StaticText(self.scan_info_panel, label="Files scanned: 0")
-        self.scan_speed_label = wx.StaticText(self.scan_info_panel, label="Scan speed: 0 file/s")
+        self.vbox.Add(self.file_paths_ctrl, 1, wx.ALL | wx.EXPAND, 10)
 
-        for label in [self.total_files_label, self.files_scanned_label, self.scan_speed_label]:
-            label.SetForegroundColour(wx.Colour(230, 210, 181))
-            self.scan_info_sizer.Add(label, 0, wx.ALL, 5)
+        self.button_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        self.scan_info_panel.SetSizer(self.scan_info_sizer)
-        self.main_sizer.Add(self.scan_info_panel, 0, wx.EXPAND | wx.ALL, 10)
+        self.btn_prev = wx.Button(self.panel, label="Back")
+        self.btn_prev.Bind(wx.EVT_BUTTON, self.back_to_previous_set)
+        self.button_sizer.Add(self.btn_prev, 0, wx.ALL | wx.CENTER, 5)
 
-        # Progress section
-        self.progress_bar = wx.Gauge(self.panel, range=100, size=(-1, 20))
-        self.progress_label = wx.StaticText(self.panel, label="Progress: 0%")
-        self.progress_label.SetForegroundColour(wx.Colour(230, 210, 181))
-        self.main_sizer.Add(self.progress_label, 0, wx.ALL | wx.CENTER, 5)
-        self.main_sizer.Add(self.progress_bar, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        self.btn_next = wx.Button(self.panel, label="Next")
+        self.btn_next.Bind(wx.EVT_BUTTON, self.next_set)
+        self.button_sizer.Add(self.btn_next, 0, wx.ALL | wx.CENTER, 5)
 
-        # Single console for both logs and file display
-        self.console = wx.TextCtrl(self.panel,
-                                   style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2,
-                                   size=(-1, 400))
-        self.console.SetBackgroundColour(wx.Colour(60, 60, 60))  # رنگ طوسی تیره
-        self.console.SetForegroundColour(wx.Colour(230, 210, 181))
-        font = wx.Font(10, wx.FONTFAMILY_TELETYPE, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
-        self.console.SetFont(font)
-        self.main_sizer.Add(self.console, 1, wx.EXPAND | wx.ALL, 10)
-
-        # Delete button
         self.btn_delete = wx.Button(self.panel, label="Delete Selected")
         self.btn_delete.Bind(wx.EVT_BUTTON, self.on_delete_selected)
-        self.main_sizer.Add(self.btn_delete, 0, wx.ALL | wx.CENTER, 10)
+        self.button_sizer.Add(self.btn_delete, 0, wx.ALL | wx.CENTER, 5)
 
-        # Status label
-        self.status_label = wx.StaticText(self.panel, label="Status: Ready")
-        self.status_label.SetForegroundColour(wx.Colour(230, 210, 181))
-        self.main_sizer.Add(self.status_label, 0, wx.ALL | wx.CENTER, 10)
+        self.vbox.Add(self.button_sizer, 0, wx.ALL | wx.CENTER, 10)
 
-        self.panel.SetSizer(self.main_sizer)
+        self.selected_count_label = wx.StaticText(self.panel, label="Selected files: 0")
+        self.selected_count_label.SetForegroundColour(wx.Colour(230, 210, 181))
+        self.vbox.Add(self.selected_count_label, 0, wx.ALL | wx.CENTER, 10)
 
-    def load_files(self):
-        """Load files and update display"""
-        self.log("Loading files...")
-        self.log(f"Scanning folder: {self.folder_path}")
-        self.files_list = self.file_handler.load_files() or []
+        self.panel.SetSizer(self.vbox)
 
-        if not self.files_list:
-            self.log("\nNo duplicate files found.")
-            self.status_label.SetLabel("Status: No duplicates found")
-        else:
-            self.show_files()
-            self.status_label.SetLabel(f"Status: Found {len(self.files_list)} duplicates")
+        self.show_current_set()
 
-    def show_files(self):
-        """Display files in the console"""
-        self.console.AppendText("\n\nDuplicate files:\n")
-        self.console.AppendText("-" * 50 + "\n")
+    def update_selected_count(self):
+        self.selected_count_label.SetLabel(f"Selected files: {len(self.selected_files)}")
 
-        for i, file_group in enumerate(self.files_list, 1):
-            self.console.AppendText(f"Group {i}:\n")
+    def show_current_set(self):
+        self.file_paths_ctrl.Clear()
+        if self.files_list and 0 <= self.current_set < len(self.files_list):
+            file_group = self.files_list[self.current_set]
+
+            file_info_list = []
+
             for file in file_group:
-                self.console.AppendText(f"• {os.path.basename(file)}\n")
-            self.console.AppendText("\n")
+                relative_path = os.path.relpath(file, self.folder_path)
 
-    def log(self, message):
-        """Add message to console"""
-        self.console.AppendText(f"{message}\n")
+                try:
+                    modified_time = os.path.getmtime(file)
+                    modified_date = datetime.datetime.fromtimestamp(modified_time).strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    modified_date = None
+
+                try:
+                    created_time = os.path.getctime(file)
+                    created_date = datetime.datetime.fromtimestamp(created_time).strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    created_date = None
+
+                file_date = modified_date if modified_date else created_date if created_date else "N/A"
+
+                file_info_list.append(f"{relative_path}   |   {file_date}")
+
+            file_paths = "\n".join(file_info_list)
+            self.file_paths_ctrl.SetValue(file_paths)
+            self.status_label.SetLabel(f"Files remaining: {len(self.files_list) - self.current_set}")
+        else:
+            self.file_paths_ctrl.SetValue("No more duplicate files found.")
+
+        self.update_selected_count()
+
+    def next_set(self, event):
+        if self.current_set < len(self.files_list) - 1:
+            self.current_set += 1
+            self.show_current_set()
+
+    def back_to_previous_set(self, event):
+        if self.current_set > 0:
+            self.current_set -= 1
+            self.show_current_set()
+
+    def on_key_press(self, event):
+        key_code = event.GetKeyCode()
+        cursor_pos = self.file_paths_ctrl.GetInsertionPoint()
+        line_start = self.file_paths_ctrl.GetRange(0, cursor_pos).rfind("\n") + 1
+        line_end = self.file_paths_ctrl.GetValue().find("\n", cursor_pos)
+        if line_end == -1:
+            line_end = len(self.file_paths_ctrl.GetValue())
+
+        selected_text = self.file_paths_ctrl.GetRange(line_start, line_end)
+
+        if selected_text:
+            # استخراج مسیر فایل از متن انتخاب شده
+            file_path = selected_text.split("   |   ")[0].strip()
+
+            # تبدیل مسیر نسبی به مطلق
+            absolute_path = os.path.join(self.folder_path, file_path)
+
+            # بررسی وجود فایل قبل از اضافه کردن به لیست
+            if os.path.exists(absolute_path):
+                if key_code == wx.WXK_SPACE:
+                    if absolute_path not in self.selected_files:
+                        self.selected_files.append(absolute_path)
+                        self.update_selected_count()
+                elif key_code == wx.WXK_ALT:
+                    if absolute_path in self.selected_files:
+                        self.selected_files.remove(absolute_path)
+                        self.update_selected_count()
+            else:
+                print(f"⚠️ File not found: {absolute_path}")
+
+        event.Skip()
 
     def on_delete_selected(self, event):
-        """Handle file deletion"""
-        self.log("\nDeletion not implemented yet")
-
-    def update_scan_info(self, data):
-        """تابع به‌روزرسانی رابط کاربری با فرمت صحیح"""
-        # تنظیم فونت فارسی
-        font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL,
-                       wx.FONTWEIGHT_NORMAL, False, 'B Nazanin')
-
-        # به‌روزرسانی برچسب‌ها با ترتیب صحیح
-        self.total_files_label.SetLabel(f"تعداد کل فایل‌ها: {data['total_files']}")
-        self.scanned_files_label.SetLabel(f"فایل‌های اسکن شده: {data['scanned_files']}")
-        self.speed_label.SetLabel(f"سرعت اسکن: {data['speed']:.1f} فایل/ثانیه")
-
-        # تنظیم پیشرفت
-        progress_value = int(data['percentage'])
-        self.progress_bar.SetValue(progress_value)
-        self.progress_label.SetLabel(f"{progress_value}%")
-
-        # اعمال فونت به همه برچسب‌ها
-        for label in [self.total_files_label, self.scanned_files_label,
-                      self.speed_label, self.progress_label]:
-            label.SetFont(font)
-            label.SetForegroundColour(wx.Colour(230, 210, 181))
+        if not self.selected_files:
+            return
+        prioritize_old = self.cb_priority_old.GetValue()  # وضعیت تیک
+        self.file_handler.delete_selected_files(self.selected_files, prioritize_old)  # پاس دادن prioritize_old
+        self.selected_files = []
+        self.files_list = self.file_handler.load_files()  # به‌روزرسانی لیست
+        self.show_current_set()
