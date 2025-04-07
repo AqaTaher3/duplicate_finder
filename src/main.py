@@ -33,7 +33,7 @@ def main():
 
         # حذف فولدر های خالی
         delete_empty_folders(folder_selected)
-        making_folders(folder_selected)
+        # making_folders(folder_selected)
 
     else:
         wx.MessageBox("No folder selected, exiting application.", "Error", wx.OK | wx.ICON_ERROR)

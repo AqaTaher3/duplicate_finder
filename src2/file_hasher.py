@@ -10,57 +10,70 @@ import warnings
 
 
 class FileHasher:
-    def __init__(self, cache_file=None):
+    def __init__(self):
         """
         Initialize FileHasher with optional cache
 
-        :param cache_file: Path to cache file for faster subsequent runs
         """
-        self.cache_file = cache_file
         self.cache = {}
         self.ignored_exts = {'.opf', '.db', '.json', '.py', '.jpg', '.ini', '.mp4', '.ebup'}
         self.music_exts = {'.mp3', '.flac', '.wav', '.aac', '.ogg', '.m4a', '.wma'}
 
-        if cache_file:
-            self._load_cache()
-            atexit.register(self._save_cache)
-
-        logging.basicConfig(filename='file_hasher.log', level=logging.ERROR)
-
-    def _load_cache(self):
-        """Load hash cache from file"""
-        try:
-            with open(self.cache_file, 'rb') as f:
-                self.cache = pickle.load(f)
-        except (FileNotFoundError, pickle.PickleError):
-            self.cache = {}
-
-    def _save_cache(self):
-        """Save hash cache to file"""
-        try:
-            with open(self.cache_file, 'wb') as f:
-                pickle.dump(self.cache, f)
-        except Exception as e:
-            logging.error(f"خطا در ذخیره کش: {str(e)}")
-
     def _hash_pdf(self, file_path):
-        """Specialized PDF hashing"""
+        """هش مقاوم به تغییرات خودکار Calibre"""
         hasher = hashlib.sha256()
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            try:
-                with open(file_path, 'rb') as f:
-                    hasher.update(f.read(1024 * 1024))  # Hash first 1MB
+        try:
+            # 1. خواندن ساختار اصلی PDF
+            reader = PdfReader(file_path)
 
-                reader = PdfReader(file_path)
-                text = ""
-                for page in reader.pages:
-                    text += page.extract_text() or ""
-                hasher.update(text.encode('utf-8'))
-                return hasher.hexdigest()
-            except Exception as e:
-                logging.error(f"خطا در پردازش PDF: {file_path} - {str(e)}")
-                return None
+            # 2. هش ویژگی‌های ساختاری کلیدی
+            structure_data = [
+                f"pages:{len(reader.pages)}",
+                *[f"pg{i}_size:{page.mediabox.width:.1f}x{page.mediabox.height:.1f}"
+                  for i, page in enumerate(reader.pages[:3])],  # فقط 3 صفحه اول
+                f"fonts:{sum(1 for page in reader.pages[:3] for font in page.get('/Font') or [])}"
+            ]
+            hasher.update("|".join(structure_data).encode('utf-8'))
+
+            # 3. هش محتوای متنی (از صفحات میانی)
+            text_samples = []
+            sample_pages = [
+                min(5, len(reader.pages) - 1),
+                len(reader.pages) // 2,
+                max(len(reader.pages) - 5, 0)
+            ]
+
+            for i in sample_pages:
+                try:
+                    text = reader.pages[i].extract_text() or ""
+                    clean_text = "".join(c for c in text if c.isalnum() or c.isspace())
+                    if clean_text:
+                        text_samples.append(clean_text[:1000])  # محدودیت حجم
+                except:
+                    continue
+
+            hasher.update("|".join(text_samples).encode('utf-8', errors='ignore'))
+
+            # 4. هش بخش‌های باینری امن
+            with open(file_path, 'rb') as f:
+                file_size = os.path.getsize(file_path)
+
+                # مناطق نمونه‌گیری (دور از 10% ابتدا و انتها)
+                sample_offsets = [
+                    int(file_size * 0.1) + 1024,
+                    int(file_size * 0.5),
+                    int(file_size * 0.9) - 1024
+                ]
+
+                for offset in sample_offsets:
+                    if 0 <= offset < file_size - 512:
+                        f.seek(offset)
+                        hasher.update(f.read(512))
+
+            return hasher.hexdigest()
+        except Exception as e:
+            logging.error(f"PDF hashing error (Calibre-resistant): {file_path} - {str(e)}")
+            return None
 
     def _hash_epub(self, file_path):
         """Specialized EPUB hashing"""
@@ -110,16 +123,7 @@ class FileHasher:
             return None
 
     def hash_file(self, file_path):
-        """Determine file type and generate appropriate hash"""
-        # Check cache first
-        if self.cache_file:
-            try:
-                mtime = os.path.getmtime(file_path)
-                if file_path in self.cache and self.cache[file_path]['mtime'] == mtime:
-                    return self.cache[file_path]['hash']
-            except OSError:
-                pass
-
+        """Determine file type"""
         ext = os.path.splitext(file_path)[1].lower()
 
         if ext in self.ignored_exts:
@@ -133,15 +137,7 @@ class FileHasher:
         else:
             result = self._hash_generic(file_path)
 
-        # Update cache
-        if self.cache_file and result:
-            try:
-                mtime = os.path.getmtime(file_path)
-                self.cache[file_path] = {'mtime': mtime, 'hash': result}
-            except OSError:
-                pass
-
-        return result
+        return result  # این خط اضافه شد
 
     @staticmethod
     def check_file_health(file_path):

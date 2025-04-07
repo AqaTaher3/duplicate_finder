@@ -28,7 +28,7 @@ class FileFinder:
         self.progress_label = progress_label
         self.log_callback = log_callback
         self.ui_update_callback = ui_update_callback
-        self.hasher = FileHasher(cache_file)
+        self.hasher = FileHasher()
 
     def _log(self, message):
         """Log messages with callback support"""
@@ -123,5 +123,7 @@ class FileFinder:
         self._log(f"✅ پردازش کامل شد. تعداد گروه‌های تکراری یافت شده: {len(duplicate_groups)}")
         self._update_ui(len(candidate_files), len(candidate_files),
                         len(candidate_files) / (time.time() - start_time), len(duplicate_groups))
+        self._log(f"number of duplicate file: {duplicate_groups}")
+        print(len(duplicate_groups))
 
         return duplicate_groups

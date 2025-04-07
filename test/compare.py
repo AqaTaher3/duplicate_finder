@@ -1,42 +1,48 @@
-import os
-import shutil
+import xml.etree.ElementTree as ET
 
 
-def remove_duplicate_folders(main_path, another_path):
-    if not os.path.exists(main_path) or not os.path.exists(another_path):
-        print("یکی از مسیرها وجود ندارد.")
-        return
+def read_opf_file(opf_path):
+    # پارس کردن فایل OPF
+    tree = ET.parse(opf_path)
+    root = tree.getroot()
 
-    # پیمایش فولدرهای اول و دوم به صورت بازگشتی
-    for root, dirs, files in os.walk(main_path, topdown=False):
-        relative_path = os.path.relpath(root, main_path)
-        corresponding_path = os.path.join(another_path, relative_path)
+    # فضای نام (namespace) معمولاً در فایل‌های OPF وجود دارد
+    namespaces = {
+        'opf': 'http://www.idpf.org/2007/opf',
+        'dc': 'http://purl.org/dc/elements/1.1/'
+    }
 
-        if os.path.exists(corresponding_path):
-            # بررسی محتویات فولدرها
-            main_files = set(os.listdir(root))
-            another_files = set(os.listdir(corresponding_path))
+    # استخراج متاداده‌ها (عنوان، نویسنده، شناسه و ...)
+    title = root.find('.//dc:title', namespaces).text
+    author = root.find('.//dc:creator', namespaces).text
+    book_id = root.find('.//dc:identifier', namespaces).text
 
-            if main_files == another_files:
-                try:
-                    shutil.rmtree(corresponding_path)  # حذف فولدر کامل
-                    print(f"folder removed : {corresponding_path}")
-                except Exception as e:
-                    print(f"eror in removing folder{corresponding_path}: {e}")
-            else:
-                # حذف فایل‌های مشابه
-                duplicate_files = main_files & another_files
-                for file in duplicate_files:
-                    file_path = os.path.join(corresponding_path, file)
-                    try:
-                        os.remove(file_path)
-                        print(f"files removed: {file_path}")
-                    except Exception as e:
-                        print(f"eror in removing files{file_path}: {e}")
+    # print(f"عنوان: {title}")
+    # print(f"نویسنده: {author}")
+    print(f"شناسه کتاب: {book_id}")
+    # لیست فایل‌های موجود در کتاب (مانند صفحات HTML، تصاویر و ...)
+    # manifest = root.find('.//opf:manifest', namespaces)
+    # for item in manifest.findall('opf:item', namespaces):
+    #     print(f"فایل: {item.get('href')} (نوع: {item.get('media-type')})")
 
 
-# مثال استفاده
-main_path = r"C:\Users\HP\Music\00_Books\000_my_new_Library"
-another_path = r"C:\Users\HP\Calibre Library"
+file = r"C:\Users\HP\Videos\01.opf"
+file2 = r"C:\Users\HP\Videos\02.opf"
 
-remove_duplicate_folders(main_path, another_path)
+# read_opf_file(file)
+# read_opf_file(file2)
+
+from lxml import etree
+
+
+def print_pretty_opf(opf_path):
+    tree = etree.parse(opf_path)
+    root = tree.getroot()
+
+    # چاپ XML با قالب‌بندی خوانا
+    xml_str = etree.tostring(root, encoding="utf-8", pretty_print=True).decode("utf-8")
+    print(xml_str)
+
+
+print_pretty_opf(file)
+print_pretty_opf(file2)
