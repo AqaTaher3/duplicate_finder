@@ -1,6 +1,13 @@
 import wx
-import os
 import datetime
+import os
+from src2 import writing_on_json
+from src2.writing_on_json import prepend_text_to_json
+
+json_log_path = 'src/log_file_not_foung.json'
+
+
+
 
 class FileFinderFrame(wx.Frame):
     def __init__(self, parent, title, folder_path, file_handler):
@@ -133,7 +140,8 @@ class FileFinderFrame(wx.Frame):
                         self.selected_files.remove(absolute_path)
                         self.update_selected_count()
             else:
-                print(f"⚠️ File not found: {absolute_path}")
+                # print(f"⚠️ File not found: {absolute_path}")
+                prepend_text_to_json(json_log_path, absolute_path)
 
         event.Skip()
 

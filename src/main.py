@@ -4,6 +4,9 @@ from src1.logic import FileHandler
 from src2.delete_empty_folders import delete_empty_folders
 from src2.corrupted_files import move_corrupted_files
 from src2.create_other_folders import making_folders
+import sys
+import ctypes
+import platform
 
 FFMPEG_PATH = r"D:\000_projects\librareis\ffmpeg\bin\ffmpeg.exe"
 
@@ -39,12 +42,30 @@ def main():
         wx.MessageBox("No folder selected, exiting application.", "Error", wx.OK | wx.ICON_ERROR)
 
 
-if __name__ == "__main__":
-    main()
+def is_admin():
+    """بررسی آیا اسکریپت با دسترسی Administrator اجرا شده است"""
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except:
+        return False
 
-    # Return only groups with duplicates
-    # return [group for group in file_hashes.values() if len(group) > 1]
-    # if len(file_hashes.values()) > 1:
-    #     return file_hashes.values()
-    # else:
-    #     return None
+
+def run_as_admin():
+    """اجرای مجدد اسکریپت با دسترسی Administrator"""
+    ctypes.windll.shell32.ShellExecuteW(
+        None, "runas", sys.executable, " ".join(sys.argv), None, 1
+    )
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    if platform.system() == "Windows":
+        if not is_admin():
+            print("درخواست دسترسی Administrator...")
+            run_as_admin()
+        else:
+            print("دسترسی Administrator تایید شد")
+            main()
+    else:
+        print("این اسکریپت فقط در ویندوز قابل اجراست")
+        main()  # یا sys.exit(1) اگر فقط برای ویندوز طراحی شده
