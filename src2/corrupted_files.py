@@ -39,6 +39,47 @@ def move_corrupted_files(source_directory, ffmpeg_path, destination_directory):
     return corrupted_files
 
 
+def remove_duplicates_from_corrupted_folder_and_otherwhere(root_dir):
+    corrupted_folder = os.path.join(root_dir, '000_corrupted_folder')
+
+    if not os.path.exists(corrupted_folder):
+        print(f"پوشه {corrupted_folder} یافت نشد!")
+        return
+
+    # لیست تمام فایل‌های موجود در پوشه خراب
+    corrupted_files = set(os.listdir(corrupted_folder))
+
+    if not corrupted_files:
+        print("پوشه خراب خالی است.")
+        return
+
+    # جستجوی بازگشتی در تمام پوشه‌ها به جز پوشه خراب
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        # از بررسی خود پوشه خراب صرف‌نظر می‌کنیم
+        if '000_corrupted_folder' in dirpath.split(os.sep):
+            continue
+
+        for filename in filenames:
+            if filename in corrupted_files:
+                # مسیر کامل فایل تکراری در پوشه خراب
+                corrupted_file_path = os.path.join(corrupted_folder, filename)
+
+                # مسیر کامل فایل خارج از پوشه خراب
+                good_file_path = os.path.join(dirpath, filename)
+
+                print(f"فایل تکراری یافت شد: {filename}")
+                print(f"حذف فایل از پوشه خراب: {corrupted_file_path}")
+
+                try:
+                    os.remove(corrupted_file_path)
+                    print("فایل از پوشه خراب با موفقیت حذف شد.")
+                    # از لیست فایل‌های خراب حذف می‌کنیم تا دوباره بررسی نشود
+                    corrupted_files.remove(filename)
+                except Exception as e:
+                    print(f"خطا در حذف فایل: {e}")
+
+
+
 # source_dir = r"D:\000_Music"
 # dest_dir = input("Enter destination directory (press Enter for default): ").strip()
 # dest_dir = dest_dir if dest_dir else None
