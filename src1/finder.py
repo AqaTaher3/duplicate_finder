@@ -55,7 +55,8 @@ class FileFinder:
                 'remaining': total - scanned,
                 'percentage': (scanned / total) * 100 if total > 0 else 0,
                 'duplicates': duplicates_found,
-                'message': f"پردازش شده: {scanned}/{total} | سرعت: {speed:.1f} فایل/ثانیه | تکراری‌ها: {duplicates_found}"
+                'message': f"پردازش شده: {scanned}/{total} | سرعت: {speed:.1f} فایل/ثانیه | تکراری‌ها: "
+                           f"{duplicates_found}"
             })
 
     def _process_file_wrapper(self, file_path):

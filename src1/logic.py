@@ -1,6 +1,7 @@
 import os
 from src1.finder import FileFinder
 
+
 class FileHandler:
     def __init__(self, folder_selected, priority_folder, keep_folder):
         self.folder_selected = folder_selected

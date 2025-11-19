@@ -1,12 +1,9 @@
 import wx
 import datetime
 import os
-from src2 import writing_on_json
 from src2.writing_on_json import prepend_text_to_json
 
 json_log_path = 'src/log_file_not_foung.json'
-
-
 
 
 class FileFinderFrame(wx.Frame):

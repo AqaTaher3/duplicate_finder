@@ -79,9 +79,10 @@ def remove_duplicates_from_corrupted_folder_and_otherwhere(root_dir):
                     print(f"خطا در حذف فایل: {e}")
 
 
+# baraye estefade kharej az code
+def for_using_right_now():
+    source_dir = r"D:\000_Music"
+    dest_dir = input("Enter destination directory (press Enter for default): ").strip()
+    dest_dir = dest_dir if dest_dir else None
 
-# source_dir = r"D:\000_Music"
-# dest_dir = input("Enter destination directory (press Enter for default): ").strip()
-# dest_dir = dest_dir if dest_dir else None
-#
-# move_corrupted_files(source_dir, dest_dir)
+    move_corrupted_files(source_dir, dest_dir)

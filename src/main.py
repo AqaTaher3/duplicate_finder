@@ -1,4 +1,4 @@
-import wx, os
+import wx
 from src1.gui import FileFinderFrame
 from src1.logic import FileHandler
 from src2.delete_empty_folders import delete_empty_folders
@@ -43,9 +43,6 @@ def main():
         wx.MessageBox("No folder selected, exiting application.", "Error", wx.OK | wx.ICON_ERROR)
 
     # delete duplicate corrupted file in corrupted and other where
-
-
-
 
 
 def is_admin():
