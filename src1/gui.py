@@ -84,6 +84,10 @@ class FileFinderFrame(wx.Frame):
         self.panel.SetSizer(self.vbox)
 
         self.show_current_set()
+        self.btn_switch_method = wx.Button(self.panel, label="🔄 تغییر روش بررسی")
+        self.btn_switch_method.Bind(wx.EVT_BUTTON, self.on_switch_method)
+        self.button_sizer.Add(self.btn_switch_method, 0, wx.ALL | wx.CENTER, 5)
+
 
     def on_old_checkbox(self, event):
         """وقتی چک‌باکس حذف فایل‌های قدیمی زده شد"""
@@ -96,6 +100,39 @@ class FileFinderFrame(wx.Frame):
         if self.cb_priority_new.GetValue():
             self.cb_priority_old.SetValue(False)
             self.cb_random.SetValue(False)
+
+    def on_switch_method(self, event):
+        """تغییر روش بررسی به نام مشابه"""
+        dlg = wx.MessageDialog(self,
+                               "آیا می‌خواهید روش بررسی را به 'نام مشابه' تغییر دهید؟\n\n"
+                               "این روش بسیار سریع‌تر است و فایل‌هایی که نام‌های شبیه دارند را پیدا می‌کند.",
+                               "تغییر روش بررسی",
+                               wx.YES_NO | wx.ICON_QUESTION | wx.NO_DEFAULT)
+
+        if dlg.ShowModal() == wx.ID_YES:
+            # بستن پنجره فعلی
+            self.Close()
+
+            # اجرای پنجره جدید
+            app = wx.GetApp()
+            if app:
+                import wx.lib.inspection
+
+                # نمایش تنظیمات
+                from settings_dialog import SimilarFilesSettingsDialog
+                settings_dlg = SimilarFilesSettingsDialog(None)
+                if settings_dlg.ShowModal() == wx.ID_OK:
+                    settings = settings_dlg.get_settings()
+
+                    # اجرای پنجره نام مشابه
+                    from similar_files_frame import SimilarFilesFrame
+                    similar_frame = SimilarFilesFrame(None, self.folder_path, settings)
+                    similar_frame.Show()
+
+                    # باید برنامه اصلی ادامه پیدا کند
+                    # این نیاز به تغییر در main loop دارد
+
+        dlg.Destroy()
 
     def on_random_checkbox(self, event):
         """وقتی چک‌باکس حذف رندوم زده شد"""
