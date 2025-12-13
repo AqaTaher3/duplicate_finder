@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.12 (duplicate_finder)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.12 (shared_venv)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.11 (shared_venv)" project-jdk-type="Python SDK" />
 </project>

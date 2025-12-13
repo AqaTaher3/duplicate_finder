@@ -40,7 +40,7 @@ def move_corrupted_files(source_directory, ffmpeg_path, destination_directory):
 
 
 def remove_duplicates_from_corrupted_folder_and_otherwhere(root_dir):
-    corrupted_folder = os.path.join(root_dir, '000_corrupted_folder')
+    corrupted_folder = os.path.join(root_dir, 'corrupted_folder')
 
     if not os.path.exists(corrupted_folder):
         print(f"پوشه {corrupted_folder} یافت نشد!")
@@ -56,7 +56,7 @@ def remove_duplicates_from_corrupted_folder_and_otherwhere(root_dir):
     # جستجوی بازگشتی در تمام پوشه‌ها به جز پوشه خراب
     for dirpath, dirnames, filenames in os.walk(root_dir):
         # از بررسی خود پوشه خراب صرف‌نظر می‌کنیم
-        if '000_corrupted_folder' in dirpath.split(os.sep):
+        if 'corrupted_folder' in dirpath.split(os.sep):
             continue
 
         for filename in filenames:
