@@ -156,6 +156,29 @@ class FileFinderFrame(wx.Frame):
         self.Center()
         self.Show()
 
+    def on_old_checkbox(self, event):
+        if self.cb_priority_old.GetValue():
+            self.cb_priority_new.SetValue(False)
+            self.cb_random.SetValue(False)
+        # رفرش کردن صفحه برای اعمال تغییرات
+        self.show_current_set()
+        self.update_selected_count()
+
+    def on_new_checkbox(self, event):
+        if self.cb_priority_new.GetValue():
+            self.cb_priority_old.SetValue(False)
+            self.cb_random.SetValue(False)
+        self.show_current_set()
+        self.update_selected_count()
+
+    def on_random_checkbox(self, event):
+        if self.cb_random.GetValue():
+            self.cb_priority_old.SetValue(False)
+            self.cb_priority_new.SetValue(False)
+        self.show_current_set()
+        self.update_selected_count()
+
+
     def load_files_background(self):
         """بارگذاری فایل‌ها در پس‌زمینه"""
 
@@ -192,4 +215,268 @@ class FileFinderFrame(wx.Frame):
         """به‌روزرسانی نوار وضعیت"""
         self.status_bar.SetStatusText(message, field)
 
-    # بقیه متدها...
+    # بعد از متدهای قبلی که اضافه کردید، این متدها را هم اضافه کنید:
+
+    def on_key_press(self, event):
+        """مدیریت کلیدهای صفحه‌کلید"""
+        key_code = event.GetKeyCode()
+
+        # موقعیت کرسر
+        cursor_pos = self.file_paths_ctrl.GetInsertionPoint()
+        text = self.file_paths_ctrl.GetValue()
+
+        # پیدا کردن خط فعلی
+        line_start = text.rfind("\n", 0, cursor_pos) + 1
+        line_end = text.find("\n", cursor_pos)
+        if line_end == -1:
+            line_end = len(text)
+
+        selected_line = text[line_start:line_end].strip()
+
+        if selected_line:
+            # استخراج مسیر فایل
+            line_content = selected_line.replace("✓ ", "").strip()
+            parts = line_content.split("   |   ")
+            if parts:
+                relative_path = parts[0].strip()
+                absolute_path = os.path.join(self.folder_path, relative_path)
+
+                # بررسی وجود فایل
+                if os.path.exists(absolute_path):
+                    if key_code == wx.WXK_SPACE:
+                        # انتخاب با Space
+                        if absolute_path not in self.selected_files:
+                            self.selected_files.append(absolute_path)
+                            print(f"File selected: {absolute_path}")
+                        else:
+                            self.selected_files.remove(absolute_path)
+                            print(f"File deselected: {absolute_path}")
+
+                        self.show_current_set()
+                        self.update_selected_count()
+
+                    elif key_code == wx.WXK_DELETE:
+                        # حذف مستقیم با Delete
+                        reply = wx.MessageBox(
+                            f"آیا می‌خواهید فایل را حذف کنید؟\n{os.path.basename(absolute_path)}",
+                            "تأیید حذف",
+                            wx.YES_NO | wx.ICON_WARNING
+                        )
+                        if reply == wx.YES:
+                            try:
+                                os.remove(absolute_path)
+                                print(f"✅ حذف شد: {os.path.basename(absolute_path)}")
+                                # بارگذاری مجدد لیست
+                                self.load_files_background()
+                            except Exception as e:
+                                print(f"❌ خطا در حذف: {e}")
+
+        event.Skip()
+
+    def on_context_menu(self, event):
+        """منوی راست کلیک"""
+        menu = wx.Menu()
+
+        # آیتم‌های منو
+        select_item = menu.Append(wx.ID_ANY, "انتخاب فایل")
+        deselect_item = menu.Append(wx.ID_ANY, "لغو انتخاب")
+        menu.AppendSeparator()
+        delete_item = menu.Append(wx.ID_ANY, "🗑️ حذف فایل")
+        menu.AppendSeparator()
+        open_item = menu.Append(wx.ID_ANY, "📂 باز کردن پوشه")
+        properties_item = menu.Append(wx.ID_ANY, "📋 اطلاعات فایل")
+
+        # نمایش منو
+        self.PopupMenu(menu)
+        menu.Destroy()
+
+    def on_frame_key(self, event):
+        """مدیریت کلیدهای پنجره"""
+        key_code = event.GetKeyCode()
+
+        if key_code == wx.WXK_F1:
+            # نمایش راهنما
+            help_text = """
+            راهنمای کلیدها:
+            • Space: انتخاب/لغو انتخاب فایل
+            • Delete: حذف فایل انتخاب شده
+            • ← →: رفتن به گروه قبلی/بعدی
+            • F1: نمایش این راهنما
+            """
+            wx.MessageBox(help_text, "راهنمای برنامه", wx.OK | wx.ICON_INFORMATION)
+
+        elif key_code == wx.WXK_LEFT:
+            self.back_to_previous_set(None)
+
+        elif key_code == wx.WXK_RIGHT:
+            self.next_set(None)
+
+        event.Skip()
+
+    def on_delete_selected(self, event):
+        """حذف فایل‌های انتخاب شده"""
+        if not self.selected_files:
+            wx.MessageBox("هیچ فایلی انتخاب نشده است!", "خطا", wx.OK | wx.ICON_WARNING)
+            return
+
+        # تأیید حذف
+        confirm_msg = f"آیا از حذف {len(self.selected_files)} فایل انتخاب شده مطمئن هستید؟"
+        dlg = wx.MessageDialog(self, confirm_msg, "تأیید حذف",
+                               wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING)
+
+        if dlg.ShowModal() != wx.ID_YES:
+            dlg.Destroy()
+            return
+        dlg.Destroy()
+
+        # حذف فایل‌ها
+        deleted_count = 0
+        for file_path in self.selected_files:
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    deleted_count += 1
+                    print(f"✅ حذف شد: {os.path.basename(file_path)}")
+            except Exception as e:
+                print(f"❌ خطا در حذف {file_path}: {e}")
+
+        # پاک کردن لیست انتخاب‌ها
+        self.selected_files = []
+
+        # بارگذاری مجدد
+        self.load_files_background()
+
+        # نمایش نتیجه
+        wx.MessageBox(f"{deleted_count} فایل حذف شد", "نتیجه", wx.OK | wx.ICON_INFORMATION)
+
+    def on_apply_to_all(self, event):
+        """اعمال استراتژی انتخاب شده روی تمام گروه‌ها"""
+        if not self.files_list:
+            return
+
+        if not (self.cb_priority_new.GetValue() or self.cb_priority_old.GetValue() or self.cb_random.GetValue()):
+            wx.MessageBox("لطفاً ابتدا یکی از گزینه‌های حذف (قدیمی/جدید/تصادفی) را انتخاب کنید.", "خطا",
+                          wx.ICON_WARNING)
+            return
+
+        count_before = len(self.selected_files)
+
+        # پاک کردن همه انتخاب‌های قبلی برای جلوگیری از تداخل
+        self.selected_files = []
+
+        # اعمال روی تک تک گروه‌ها
+        for group in self.files_list:
+            self.apply_strategy_logic(group)
+
+        # به‌روزرسانی نمایش
+        self.show_current_set()
+        self.update_selected_count()
+
+        diff = len(self.selected_files)
+        wx.MessageBox(f"استراتژی روی تمام فایل‌ها اعمال شد.\nتعداد {diff} فایل برای حذف انتخاب شدند.", "موفقیت",
+                      wx.ICON_INFORMATION)
+
+    def on_switch_method(self, event):
+        """تغییر روش بررسی"""
+        wx.MessageBox("تغییر به روش نام مشابه", "توجه", wx.OK | wx.ICON_INFORMATION)
+
+    def on_undo(self, event):
+        """بازگردانی"""
+        wx.MessageBox("قابلیت بازگردانی", "توجه", wx.OK | wx.ICON_INFORMATION)
+
+    def back_to_previous_set(self, event):
+        """گروه قبلی"""
+        if self.current_set > 0:
+            self.current_set -= 1
+            self.show_current_set()
+
+    def next_set(self, event):
+        """گروه بعدی"""
+        if self.current_set < len(self.files_list) - 1:
+            self.current_set += 1
+            self.show_current_set()
+
+    def show_current_set(self):
+        """نمایش گروه فعلی"""
+        self.file_paths_ctrl.Clear()
+        if self.files_list and 0 <= self.current_set < len(self.files_list):
+            file_group = self.files_list[self.current_set]
+            self.apply_strategy_logic(file_group)
+
+            file_info_list = []
+
+            for file in file_group:
+                relative_path = os.path.relpath(file, self.folder_path)
+
+                try:
+                    modified_time = os.path.getmtime(file)
+                    modified_date = datetime.datetime.fromtimestamp(modified_time).strftime('%Y-%m-%d %H:%M:%S')
+                except Exception:
+                    modified_date = "نامشخص"
+
+                # علامت اگر انتخاب شده
+                prefix = "✓ " if file in self.selected_files else "  "
+                file_info_list.append(f"{prefix}{relative_path}   |   {modified_date}")
+
+            file_paths = "\n".join(file_info_list)
+            self.file_paths_ctrl.SetValue(file_paths)
+
+            # آپدیت وضعیت
+            remaining = len(self.files_list) - self.current_set - 1
+            self.status_label.SetLabel(
+                f"گروه {self.current_set + 1} از {len(self.files_list)} ({remaining} گروه باقی‌مانده)")
+        else:
+            self.file_paths_ctrl.SetValue("هیچ گروهی برای نمایش وجود ندارد.")
+            self.status_label.SetLabel("کار تمام شد!")
+
+    def update_selected_count(self):
+        """به‌روزرسانی تعداد انتخاب‌ها"""
+        self.selected_count_label.SetLabel(f"انتخاب شده: {len(self.selected_files)} فایل")
+
+    def apply_strategy_logic(self, file_group):
+        """اعمال استراتژی انتخاب روی یک گروه فایل"""
+        if not file_group:
+            return
+
+        # ابتدا تمام فایل‌های این گروه را از لیست انتخاب شده‌ها خارج می‌کنیم (ریست کردن گروه)
+        for f in file_group:
+            if f in self.selected_files:
+                self.selected_files.remove(f)
+
+        files_to_select = []
+
+        # اگر هیچ استراتژی انتخاب نشده باشد، کاری نکن
+        if not (self.cb_priority_new.GetValue() or self.cb_priority_old.GetValue() or self.cb_random.GetValue()):
+            return
+
+        # دریافت زمان فایل‌ها
+        files_with_time = []
+        for f in file_group:
+            try:
+                mtime = os.path.getmtime(f)
+            except:
+                mtime = 0
+            files_with_time.append((f, mtime))
+
+        if self.cb_priority_new.GetValue():
+            # حذف جدیدترها -> یعنی قدیمی‌ترین را نگه دار (مرتب‌سازی صعودی زمان)
+            # اولین آیتم (index 0) قدیمی‌ترین است، پس آن را حذف نمی‌کنیم. بقیه را انتخاب می‌کنیم.
+            files_with_time.sort(key=lambda x: x[1])
+            files_to_select = [x[0] for x in files_with_time[1:]]
+
+        elif self.cb_priority_old.GetValue():
+            # حذف قدیمی‌ترها -> یعنی جدیدترین را نگه دار (مرتب‌سازی نزولی زمان)
+            # اولین آیتم جدیدترین است، آن را نگه می‌داریم.
+            files_with_time.sort(key=lambda x: x[1], reverse=True)
+            files_to_select = [x[0] for x in files_with_time[1:]]
+
+        elif self.cb_random.GetValue():
+            # حذف تصادفی -> یکی را نگه دار
+            if len(file_group) > 1:
+                keep_index = random.randint(0, len(file_group) - 1)
+                for i, f in enumerate(file_group):
+                    if i != keep_index:
+                        files_to_select.append(f)
+
+        # اضافه کردن به لیست اصلی انتخاب شده‌ها
+        self.selected_files.extend(files_to_select)
