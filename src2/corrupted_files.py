@@ -1,7 +1,7 @@
 import os
 import shutil
 import subprocess
-from tqdm import tqdm  # Import tqdm for progress bar
+from tqdm import tqdm
 
 
 def check_file_integrity(file_path, ffmpeg_path):
@@ -19,6 +19,7 @@ def check_file_integrity(file_path, ffmpeg_path):
 
 
 def move_corrupted_files(source_directory, ffmpeg_path, destination_directory):
+    """تابع اصلی که در main.py استفاده می‌شود"""
 
     corrupted_files = []
     total_files = sum([len(files) for _, _, files in os.walk(source_directory)])  # Total number of files
@@ -40,7 +41,7 @@ def move_corrupted_files(source_directory, ffmpeg_path, destination_directory):
 
 
 def remove_duplicates_from_corrupted_folder_and_otherwhere(root_dir):
-    corrupted_folder = os.path.join(root_dir, 'corrupted_folder')
+    corrupted_folder = os.path.join(root_dir, '000', 'Corrupted_folder')
 
     if not os.path.exists(corrupted_folder):
         print(f"پوشه {corrupted_folder} یافت نشد!")

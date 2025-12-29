@@ -1,4 +1,5 @@
 import wx, os, stat
+import traceback
 from src1.gui import FileFinderFrame
 from src1.logic import FileHandler
 from src2.delete_empty_folders import delete_empty_folders
@@ -6,31 +7,39 @@ from src2.corrupted_files import move_corrupted_files, remove_duplicates_from_co
 from src2.create_other_folders import making_folders
 from src3.similar_files_frame import SimilarFilesFrame
 from src3.settings_dialog import SimilarFilesSettingsDialog
+from log_manager import log_manager
+
+logger = log_manager.get_logger("main")
+log_manager.log_startup()
 
 FFMPEG_PATH = r"D:\000_projects\librareis\ffmpeg\bin\ffmpeg.exe"
-finding_corrupted_files = False
+finding_corrupted_files = False  # پیش‌فرض غیرفعال برای سرعت بیشتر
 
 
 def change_folder_permissions(folder_path):
-    """تغییر دسترسی پوشه"""
-    for root, dirs, files in os.walk(folder_path):
-        for dir_name in dirs:
-            dir_path = os.path.join(root, dir_name)
-            try:
-                os.chmod(dir_path, stat.S_IWRITE)
-            except:
-                pass
-        for file_name in files:
-            file_path = os.path.join(root, file_name)
-            try:
-                os.chmod(file_path, stat.S_IWRITE)
-            except:
-                pass
+    """تغییر دسترسی پوشه - بهینه‌سازی شده"""
+    try:
+        for root, dirs, files in os.walk(folder_path):
+            for dir_name in dirs:
+                dir_path = os.path.join(root, dir_name)
+                try:
+                    os.chmod(dir_path, stat.S_IWUSR | stat.S_IRUSR)
+                except:
+                    continue
+
+            for file_name in files:
+                file_path = os.path.join(root, file_name)
+                try:
+                    os.chmod(file_path, stat.S_IWUSR | stat.S_IRUSR)
+                except:
+                    continue
+    except Exception as e:
+        logger.error(f"خطا در تغییر دسترسی پوشه: {e}")
 
 
 def show_method_selection_dialog(parent, folder_path):
-    """نمایش دیالوگ انتخاب روش بررسی فایل‌های تکراری"""
-    dlg = wx.Dialog(parent, title="انتخاب روش بررسی", size=(500, 350))
+    """نمایش دیالوگ انتخاب روش - بهینه‌سازی شده"""
+    dlg = wx.Dialog(parent, title="انتخاب روش بررسی", size=(500, 380))
     dlg.SetBackgroundColour(wx.Colour(43, 58, 68))
 
     panel = wx.Panel(dlg)
@@ -39,43 +48,44 @@ def show_method_selection_dialog(parent, folder_path):
     vbox = wx.BoxSizer(wx.VERTICAL)
 
     # عنوان
-    title = wx.StaticText(panel, label="روش بررسی فایل‌های تکراری را انتخاب کنید")
+    title = wx.StaticText(panel, label="روش بررسی فایل‌های تکراری")
     title.SetForegroundColour(wx.Colour(230, 210, 181))
-    title_font = wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+    title_font = wx.Font(16, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
     title.SetFont(title_font)
     vbox.Add(title, 0, wx.ALL | wx.CENTER, 20)
 
-    # گزینه ۱: هش کردن (دقیق)
-    btn_hash = wx.Button(panel, label="🔍 روش دقیق (هش کردن)", size=(400, 60))
+    # گزینه ۱: هش کردن
+    btn_hash = wx.Button(panel, label="🔍 روش دقیق (هش کردن)")
     btn_hash.SetBackgroundColour(wx.Colour(60, 179, 113))
     btn_hash.SetForegroundColour(wx.WHITE)
     btn_hash.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
-    vbox.Add(btn_hash, 0, wx.ALL | wx.CENTER, 10)
+    btn_hash.SetToolTip("بررسی ۱۰۰٪ دقیق بر اساس محتوای فایل")
+    vbox.Add(btn_hash, 0, wx.ALL | wx.EXPAND, 10)
 
-    # توضیح گزینه ۱
-    desc1 = wx.StaticText(panel,
-                          label="• بررسی ۱۰۰٪ دقیق بر اساس محتوای فایل\n• کندتر اما کاملاً مطمئن\n• مناسب فایل‌های حیاتی")
-    desc1.SetForegroundColour(wx.Colour(200, 200, 200))
-    vbox.Add(desc1, 0, wx.ALL | wx.LEFT, 30)
-
-    # گزینه ۲: نام مشابه (سریع)
-    btn_name = wx.Button(panel, label="⚡ روش سریع (نام مشابه)", size=(400, 60))
+    # گزینه ۲: نام مشابه
+    btn_name = wx.Button(panel, label="⚡ روش سریع (نام مشابه)")
     btn_name.SetBackgroundColour(wx.Colour(70, 130, 180))
     btn_name.SetForegroundColour(wx.WHITE)
     btn_name.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
-    vbox.Add(btn_name, 0, wx.ALL | wx.CENTER, 10)
+    btn_name.SetToolTip("بررسی بر اساس شباهت نام فایل‌ها")
+    vbox.Add(btn_name, 0, wx.ALL | wx.EXPAND, 10)
 
-    # توضیح گزینه ۲
-    desc2 = wx.StaticText(panel,
-                          label="• بررسی بر اساس شباهت نام فایل‌ها\n• بسیار سریع\n• مناسب فایل‌های رسانه و مستندات")
-    desc2.SetForegroundColour(wx.Colour(200, 200, 200))
-    vbox.Add(desc2, 0, wx.ALL | wx.LEFT, 30)
+    # گزینه ۳: ترکیبی
+    btn_hybrid = wx.Button(panel, label="🔗 روش ترکیبی")
+    btn_hybrid.SetBackgroundColour(wx.Colour(153, 50, 204))
+    btn_hybrid.SetForegroundColour(wx.WHITE)
+    btn_hybrid.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
+    btn_hybrid.SetToolTip("ابتدا نام مشابه، سپس بررسی هش")
+    vbox.Add(btn_hybrid, 0, wx.ALL | wx.EXPAND, 10)
+
+    vbox.AddSpacer(20)
 
     # دکمه انصراف
-    btn_cancel = wx.Button(panel, label="انصراف", size=(200, 40))
+    btn_cancel = wx.Button(panel, label="انصراف")
     vbox.Add(btn_cancel, 0, wx.ALL | wx.CENTER, 10)
 
     panel.SetSizer(vbox)
+    dlg.Center()
 
     # تنظیم نتیجه
     result = {"method": None}
@@ -88,95 +98,139 @@ def show_method_selection_dialog(parent, folder_path):
         result["method"] = "name"
         dlg.EndModal(wx.ID_OK)
 
+    def on_hybrid_method(event):
+        result["method"] = "hybrid"
+        dlg.EndModal(wx.ID_OK)
+
     def on_cancel(event):
-        result["method"] = None
         dlg.EndModal(wx.ID_CANCEL)
 
     btn_hash.Bind(wx.EVT_BUTTON, on_hash_method)
     btn_name.Bind(wx.EVT_BUTTON, on_name_method)
+    btn_hybrid.Bind(wx.EVT_BUTTON, on_hybrid_method)
     btn_cancel.Bind(wx.EVT_BUTTON, on_cancel)
 
-    if dlg.ShowModal() == wx.ID_OK:
-        return result["method"]
-    return None
+    return result["method"] if dlg.ShowModal() == wx.ID_OK else None
 
 
 def main():
     try:
+        logger.info("برنامه در حال راه‌اندازی...")
         app = wx.App(False)
 
-        dialog = wx.DirDialog(None, "Select a Folder")
-        if dialog.ShowModal() == wx.ID_OK:
-            folder_selected = dialog.GetPath()
-        else:
-            folder_selected = None
+        # نمایش دیالوگ انتخاب پوشه
+        dialog = wx.DirDialog(None, "لطفاً یک پوشه را انتخاب کنید",
+                              style=wx.DD_DEFAULT_STYLE | wx.DD_DIR_MUST_EXIST)
 
+        if dialog.ShowModal() != wx.ID_OK:
+            logger.warning("هیچ پوشه‌ای انتخاب نشد")
+            wx.MessageBox("هیچ پوشه‌ای انتخاب نشد. برنامه بسته می‌شود.",
+                          "توجه", wx.OK | wx.ICON_INFORMATION)
+            dialog.Destroy()
+            return
+
+        folder_selected = dialog.GetPath()
         dialog.Destroy()
+        logger.info(f"پوشه انتخاب شد: {folder_selected}")
 
-        if folder_selected:
-            # نمایش منوی انتخاب روش
-            method = show_method_selection_dialog(None, folder_selected)
-            if method is None:
-                print("عملیات توسط کاربر لغو شد.")
-                return
+        if not os.path.exists(folder_selected):
+            wx.MessageBox(f"پوشه انتخاب شده وجود ندارد:\n{folder_selected}",
+                          "خطا", wx.OK | wx.ICON_ERROR)
+            return
 
-            change_folder_permissions(folder_selected)
-            [keep_folder, priority_folder, corrupted_folder] = making_folders(folder_selected)
+        # نمایش منوی انتخاب روش
+        method = show_method_selection_dialog(None, folder_selected)
+        if method is None:
+            logger.info("عملیات توسط کاربر لغو شد.")
+            return
 
-            if finding_corrupted_files:
-                move_corrupted_files(folder_selected, FFMPEG_PATH, corrupted_folder)
+        logger.info(f"روش انتخاب شده: {method}")
 
+        # تغییر دسترسی‌ها
+        change_folder_permissions(folder_selected)
+
+        # ایجاد پوشه‌های لازم
+        [keep_folder, priority_folder, corrupted_folder] = making_folders(folder_selected)
+
+        # بررسی فایل‌های خراب (در صورت فعال بودن)
+        if finding_corrupted_files and os.path.exists(FFMPEG_PATH):
+            move_corrupted_files(folder_selected, FFMPEG_PATH, corrupted_folder)
             remove_duplicates_from_corrupted_folder_and_otherwhere(folder_selected)
 
-            if method == "hash":
-                # روش هش کردن
-                handler = FileHandler(folder_selected, priority_folder, keep_folder)
-                frame = FileFinderFrame(None, "File Finder", folder_selected, handler)
-                frame.Show()
-                app.MainLoop()
+        if method == "hash":
+            # روش هش کردن
+            handler = FileHandler(folder_selected, priority_folder, keep_folder)
+            frame = FileFinderFrame(None, "Duplicates Cleaner - روش دقیق", folder_selected, handler)
+            frame.Show()
+            app.MainLoop()
 
-                # بعد از بسته شدن، پیشنهاد روش نام مشابه
-                dlg = wx.MessageDialog(None,
-                                       "آیا می‌خواهید فایل‌های با نام‌های مشابه را نیز بررسی کنید؟",
-                                       "بررسی اضافی",
-                                       wx.YES_NO | wx.ICON_QUESTION)
+            # پیشنهاد روش بعدی
+            dlg = wx.MessageDialog(None,
+                                   "آیا می‌خواهید فایل‌های با نام‌های مشابه را نیز بررسی کنید؟",
+                                   "بررسی اضافی",
+                                   wx.YES_NO | wx.ICON_QUESTION | wx.NO_DEFAULT)
 
-                if dlg.ShowModal() == wx.ID_YES:
-                    dlg.Destroy()
-
-                    # تنظیمات برای نام مشابه
-                    settings_dlg = SimilarFilesSettingsDialog(None)
-                    if settings_dlg.ShowModal() == wx.ID_OK:
-                        settings = settings_dlg.get_settings()
-                        similar_frame = SimilarFilesFrame(None, folder_selected, settings)
-                        similar_frame.Show()
-
-                        # اجرای برنامه جدید
-                        app2 = wx.App(False)
-                        app2.MainLoop()
-                else:
-                    dlg.Destroy()
-
-            elif method == "name":
-                # روش نام مشابه (مستقیم)
+            if dlg.ShowModal() == wx.ID_YES:
                 settings_dlg = SimilarFilesSettingsDialog(None)
                 if settings_dlg.ShowModal() == wx.ID_OK:
                     settings = settings_dlg.get_settings()
                     similar_frame = SimilarFilesFrame(None, folder_selected, settings)
                     similar_frame.Show()
+                    wx.Yield()  # آپدیت UI
+
+            dlg.Destroy()
+
+        elif method == "name":
+            # روش نام مشابه
+            settings_dlg = SimilarFilesSettingsDialog(None)
+            if settings_dlg.ShowModal() == wx.ID_OK:
+                settings = settings_dlg.get_settings()
+                similar_frame = SimilarFilesFrame(None, folder_selected, settings)
+                similar_frame.Show()
+                app.MainLoop()
+
+        elif method == "hybrid":
+            # روش ترکیبی - ابتدا نام مشابه، سپس هش
+            settings_dlg = SimilarFilesSettingsDialog(None)
+            if settings_dlg.ShowModal() == wx.ID_OK:
+                settings = settings_dlg.get_settings()
+
+                # مرحله اول: نام مشابه
+                similar_frame = SimilarFilesFrame(None, folder_selected, settings)
+                similar_frame.Show()
+
+                # صبر تا بسته شدن پنجره
+                while similar_frame.IsShown():
+                    wx.Yield()
+                    wx.MilliSleep(100)
+
+                # مرحله دوم: هش کردن
+                reply = wx.MessageBox("آیا می‌خواهید بررسی دقیق (هش) را نیز انجام دهید؟",
+                                      "مرحله بعدی",
+                                      wx.YES_NO | wx.ICON_QUESTION)
+
+                if reply == wx.YES:
+                    handler = FileHandler(folder_selected, priority_folder, keep_folder)
+                    frame = FileFinderFrame(None, "Duplicates Cleaner - روش دقیق",
+                                            folder_selected, handler)
+                    frame.Show()
                     app.MainLoop()
 
-            # حذف فولدر های خالی
+        # حذف پوشه‌های خالی
+        try:
             delete_empty_folders(folder_selected)
+        except Exception as e:
+            logger.error(f"خطا در حذف پوشه‌های خالی: {e}")
 
-        else:
-            wx.MessageBox("No folder selected, exiting application.", "Error", wx.OK | wx.ICON_ERROR)
+        logger.info("برنامه با موفقیت به پایان رسید")
 
     except Exception as e:
-        print(f"Error: {e}")
-        import traceback
+        logger.exception(f"خطای غیرمنتظره در main: {str(e)}")
+        wx.MessageBox(f"خطای شدید در اجرای برنامه:\n{str(e)}",
+                      "خطا", wx.OK | wx.ICON_ERROR)
         traceback.print_exc()
-        input("Press Enter to exit...")
+    finally:
+        log_manager.log_shutdown()
 
 
 if __name__ == "__main__":
