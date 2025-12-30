@@ -8,6 +8,7 @@ import wx
 from dataclasses import dataclass
 from pathlib import Path
 
+exclude_extensions={"jpg", "png", "gif", "mp4", "jpeg"}
 
 @dataclass
 class FileInfo:
@@ -24,16 +25,9 @@ class SimilarNameFinder:
     """کلاس یافتن فایل‌های با نام مشابه"""
 
     def __init__(self, folder_path: str, min_similarity: float = 0.7,
-                 min_length: int = 10, use_cache: bool = True):
-        """
-        مقداردهی اولیه
+                 min_length: int = 10, use_cache: bool = True,
+                 exclude_extensions: Set[str] = None):
 
-        پارامترها:
-            folder_path: مسیر پوشه
-            min_similarity: حداقل شباهت (0-1)
-            min_length: حداقل طول نام برای بررسی
-            use_cache: استفاده از کش
-        """
         self.folder_path = folder_path
         self.min_similarity = min_similarity
         self.min_length = min_length
@@ -42,38 +36,95 @@ class SimilarNameFinder:
         self.results: List[List[str]] = []
         self.file_cache: Dict[str, FileInfo] = {}
 
-        # تنظیمات پیش‌فرض برای نرمال‌سازی
+        # تغییر: قوانین نرمال‌سازی ساده‌تر
         self.normalization_rules = [
             (r'\d+', ''),  # حذف اعداد
-            (r'[^\w\s\-]', ''),  # حذف کاراکترهای خاص
-            (r'\s+', ' '),  # جایگزینی فاصله‌های اضافه
+            (r'[^\w\s\-]', ''),  # حذف کاراکترهای خاص (بجز underline)
+            (r'[_\-]+', ' '),  # تبدیل underline و dash به فاصله
+            (r'\s+', ' '),  # تبدیل فاصله‌های متعدد به یک
         ]
 
-        # کلمات متداول برای حذف
-        self.common_words = {
-            'official', 'version', 'remastered', 'remaster', 'original',
-            'extended', 'clean', 'explicit', 'instrumental', 'acoustic',
-            'live', 'studio', 'mix', 'edit', 'radio', 'single', 'album'
+        # لیست کلمات بلاک شده (با اضافات جدید)
+        self.blocked_names = {
+            'album', 'albums', 'disc', 'cd',
+            'unknown artist', 'unknown', 'artist',
+            'track', 'tracks', 'unknown album',
+            'unknown title', 'title', 'untitled',
+            'file', 'song', 'music', 'audio',
+            # اضافه کردن کلمات رایج بی‌معنی
+            'techno', 'collection', 'mix', 'remix',
+            'vol', 'volume', 'part', 'chapter', '(FLAC)', 'FLAC', 'AudioTrack', 'Audio'
+            'audiotrack', 'audio track',
+            'soundtrack',
+            'techno', 'collection', 'mix', 'remix',
+            'vol', 'volume', 'part', 'chapter'
         }
 
+        self.exclude_extensions = {
+            ext.lower().lstrip('.') for ext in (exclude_extensions or [])
+        }
+
+    def _is_numeric_name(self, name: str) -> bool:
+        """
+        بررسی اینکه نام فقط عدد است (مثل 01، 002، 10)
+        """
+        return name.isdigit()
+
     def _normalize_filename(self, filename: str) -> str:
-        """نرمال‌سازی نام فایل"""
+        """نرمال‌سازی نام فایل با فیلتر هوشمند"""
         # جدا کردن نام و پسوند
         name_part = Path(filename).stem.lower()
 
-        # اعمال قوانین نرمال‌سازی
+        # ❌ حذف pattern‌های رایج بی‌معنی قبل از نرمال‌سازی
+        patterns_to_remove = [
+            r'audio\s*track\s*\d*',
+            r'track\s*\d*',
+            r'sound\s*track\s*\d*',
+            r'\d+\s*[-_]\s*',  # حذف اعداد و dash/underline قبل از آنها
+        ]
+
+        for pattern in patterns_to_remove:
+            name_part = re.sub(pattern, ' ', name_part, flags=re.IGNORECASE)
+
+        # اعمال قوانین نرمال‌سازی اولیه
         for pattern, replacement in self.normalization_rules:
             name_part = re.sub(pattern, replacement, name_part)
 
-        # حذف کلمات متداول
+        # حذف underline و dash و تبدیل به فاصله
+        name_part = name_part.replace('_', ' ').replace('-', ' ').strip()
+
+        # حذف کلمات بلاک‌شده
         words = name_part.split()
-        filtered_words = [w for w in words if w not in self.common_words and len(w) > 2]
+        filtered_words = []
+
+        for word in words:
+            word = word.strip()
+
+            # ❌ حذف کلمات کوتاه
+            if len(word) < 3:
+                continue
+
+            # ❌ حذف کلمات بلاک شده
+            if word in self.blocked_names:
+                continue
+
+            # ❌ حذف کلماتی که حاوی "track" هستند
+            if 'track' in word:
+                continue
+
+            filtered_words.append(word)
 
         # بازگرداندن رشته نرمال شده
         normalized = ' '.join(filtered_words).strip()
 
-        return normalized
+        # ❗ اگر کمتر از 5 حرف یا فقط یک کلمه کوتاه است، نادیده بگیر
+        if len(normalized) < 5:
+            return ""
 
+        if len(filtered_words) == 1 and len(filtered_words[0]) < 6:
+            return ""
+
+        return normalized
     def _calculate_similarity(self, str1: str, str2: str) -> float:
         """محاسبه شباهت بین دو رشته"""
         # استفاده از SequenceMatcher با تنظیمات بهینه
@@ -82,14 +133,53 @@ class SimilarNameFinder:
     def _get_file_info(self, file_path: str) -> FileInfo:
         """دریافت اطلاعات فایل"""
         try:
+            path_obj = Path(file_path)
+            filename = path_obj.name.lower()
+
+            # ❌ فیلتر pattern‌های track-like و نام‌های بی‌معنی
+            blocked_patterns = [
+                # الگوهای track
+                r'audio\s*track\s*\d+',
+                r'track\s*\d+',
+                r'\d+\s*[-_]\s*track',
+                r'\d+\s*[-_]\s*audiotrack',
+
+                # الگوهای song
+                r'\d+\s*[-_]\s*song',
+                r'song\s*\d+',
+
+                # الگوهای music
+                r'\d+\s*[-_]\s*music',
+                r'music\s*\d+',
+
+                # فایل‌های system
+                r'^albumart',
+                r'^folder',
+                r'^desktop',
+                r'^thumbs',
+                r'^cover',
+            ]
+
+            for pattern in blocked_patterns:
+                if re.search(pattern, filename):
+                    return None  # ❌ این فایل را نادیده بگیر
+
+            # فیلتر پسوند
+            ext = path_obj.suffix.lower().lstrip('.')
+            if ext in self.exclude_extensions:
+                return None
+
             # بررسی کش
             if self.use_cache and file_path in self.file_cache:
                 return self.file_cache[file_path]
 
             # استخراج اطلاعات
-            path_obj = Path(file_path)
             name = path_obj.name
             normalized_name = self._normalize_filename(name)
+
+            # ❗ اگر نام نرمال شده خالی بود، فایل را نادیده بگیر
+            if not normalized_name:
+                return None
 
             stats = path_obj.stat()
 
@@ -111,17 +201,22 @@ class SimilarNameFinder:
         except Exception as e:
             print(f"❌ خطا در دریافت اطلاعات {file_path}: {e}")
             return None
-
     def _find_similar_groups(self, files_info: List[FileInfo]) -> List[List[str]]:
         """یافتن گروه‌های مشابه"""
         # گروه‌بندی بر اساس نام نرمال شده
         groups_by_name = collections.defaultdict(list)
 
         for file_info in files_info:
-            if not file_info or len(file_info.normalized_name) < self.min_length:
+            if not file_info:
                 continue
 
-            groups_by_name[file_info.normalized_name].append(file_info)
+            norm = file_info.normalized_name
+
+            # ❗ اطمینان از وجود نام نرمال (در اینجا نباید خالی باشد)
+            if not norm:
+                continue
+
+            groups_by_name[norm].append(file_info)
 
         # یافتن گروه‌های مشابه در هر گروه اصلی
         similar_groups = []
@@ -145,7 +240,10 @@ class SimilarNameFinder:
                         continue
 
                     # محاسبه شباهت
-                    similarity = self._calculate_similarity(file1.name, file2.name)
+                    similarity = self._calculate_similarity(
+                        file1.normalized_name,
+                        file2.normalized_name
+                    )
 
                     if similarity >= self.min_similarity:
                         current_group.append(file2.path)
@@ -156,15 +254,18 @@ class SimilarNameFinder:
                     similar_groups.append(current_group)
 
         return similar_groups
-
     def find_similar_files(self, progress_callback=None) -> List[List[str]]:
         """یافتن فایل‌های با نام‌های مشابه"""
         all_files = []
 
         try:
-            # جمع‌آوری تمام فایل‌ها
             for root, dirs, files in os.walk(self.folder_path):
                 for filename in files:
+                    ext = Path(filename).suffix.lower().lstrip('.')  # ✅ اینجا درست است
+
+                    if ext in self.exclude_extensions:
+                        continue  # ⛔ فیلتر پسوند
+
                     file_path = os.path.join(root, filename)
                     all_files.append(file_path)
 
@@ -219,10 +320,14 @@ class SimilarNameFinder:
 
             return similar_groups
 
+
         except Exception as e:
+
             print(f"❌ خطا در جستجوی فایل‌های مشابه: {e}")
+
             if progress_callback:
                 wx.CallAfter(progress_callback, 100, f"❌ خطا: {str(e)}")
+
             return []
 
     def find_exact_name_matches(self) -> List[List[str]]:

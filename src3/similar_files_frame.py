@@ -93,14 +93,22 @@ class SimilarFilesFrame(wx.Frame):
         wx.Yield()  # آپدیت UI
 
         try:
+            # لیست کامل فرمت‌های تصویری و ویدیویی
+            image_video_extensions = {
+                "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif",
+                "mp4", "avi", "mkv", "mov", "wmv", "flv", "webm",
+                "heic", "heif", "svg", "ico", "psd", "raw"
+            }
+
             # ایجاد شیء جستجو
             finder = SimilarNameFinder(
                 self.folder_path,
                 min_similarity=self.settings['min_similarity'],
-                min_length=self.settings['min_length']
+                min_length=self.settings['min_length'],
+                exclude_extensions=image_video_extensions  # ✅ پاس دادن لیست کامل
             )
 
-            # جستجو (بدون دیالوگ پیشرفت برای سادگی)
+            # جستجو
             self.groups = finder.find_similar_files()
 
             if self.groups:
@@ -389,3 +397,17 @@ class SimilarFilesFrame(wx.Frame):
                 "پایان کار", wx.OK | wx.ICON_INFORMATION)
 
         event.Skip()
+
+    def _get_normalized_name(self, file_path: str) -> str:
+        """دریافت نام نرمال شده یک فایل (برای دیباگ)"""
+        try:
+            # ایجاد یک instance موقت از SimilarNameFinder
+            from src3.similar_names import SimilarNameFinder
+            finder = SimilarNameFinder(
+                self.folder_path,
+                min_similarity=self.settings['min_similarity'],
+                min_length=self.settings['min_length']
+            )
+            return finder._normalize_filename(os.path.basename(file_path))
+        except:
+            return ""
