@@ -12,6 +12,7 @@ def making_folders(folder_selected):
         priority_folder = os.path.join(base_000, "PriorityFolder")
         corrupted_folder = os.path.join(base_000, "Corrupted_folder")
         keep_folder = os.path.join(base_000, "Keep_folder")
+        backup_deleted = os.path.join(base_000, "backup_deleted")
 
         folders_to_create = [
             (base_000, "پوشه پایه 000"),

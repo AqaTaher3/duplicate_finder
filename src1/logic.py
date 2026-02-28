@@ -8,10 +8,11 @@ from src.log_manager import log_manager
 
 
 class FileHandler:
-    def __init__(self, folder_selected, priority_folder, keep_folder, auto_delete=True):
+    def __init__(self, folder_selected, priority_folder, keep_folder, backup_deleted, auto_delete=True):
         self.folder_selected = folder_selected
         self.priority_folder = priority_folder
         self.keep_folder = keep_folder
+        self.backup_dir = backup_deleted
         self.auto_delete = auto_delete
         self.current_set = 0
         self.selected_files = []
@@ -21,8 +22,6 @@ class FileHandler:
         self.use_recycle_bin = True  # استفاده از سطل بازیافت به جای حذف دائم
         self.logger = log_manager.get_logger("FileHandler")
 
-        # ایجاد پوشه بک‌آپ
-        self.backup_dir = os.path.join(folder_selected, "_backup_deleted")
         if not os.path.exists(self.backup_dir):
             os.makedirs(self.backup_dir)
 
