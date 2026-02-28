@@ -1,13 +1,13 @@
 import os
 import wx
 import time
-import hashlib
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import functools
 from src2.file_hasher import FileHasher
 import collections
 from src.log_manager import log_manager
+from src.config import config  # ✅ اضافه کردن import
 
 
 class FileFinder:
@@ -21,14 +21,20 @@ class FileFinder:
         self.log_callback = log_callback
         self.ui_update_callback = ui_update_callback
         self.hasher = FileHasher()
-        self.batch_size = batch_size
+        self.batch_size = batch_size or config.get("batch_size", 1000)
 
         # لیست فرمت‌های قابل پردازش
-        self.supported_extensions = {
-            '.mp3', '.flac', '.wav', '.aac', '.ogg', '.m4a', '.wma',
-            '.mp4', '.avi', '.mkv', '.mov', '.wmv',
-            '.jpg', '.jpeg', '.png', '.gif', '.bmp',
-            '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt'
+        self.supported_extensions = set(config.get("supported_extensions", []))
+
+        # ✅ اضافه کردن last_update_time
+        self.last_update_time = time.time()
+
+        # ✅ اضافه کردن دیگر متغیرهای ضروری
+        self.stats = {
+            'total_files_scanned': 0,
+            'files_processed': 0,
+            'hash_time': 0,
+            'groups_found': 0
         }
 
         self.logger = log_manager.get_logger("FileFinder")
@@ -152,13 +158,26 @@ class FileFinder:
         start_time = time.time()
         self._log("🔍 شروع فرآیند یافتن فایل‌های تکراری...")
 
+        # ✅ ریست last_update_time
+        self.last_update_time = start_time
+
+        # ریست آمار
+        self.stats = {
+            'total_files': 0,
+            'files_processed': 0,
+            'hash_time': 0,
+            'groups_found': 0,
+            'start_time': start_time
+        }
+
         try:
             # First pass - count files and build size map
             size_map, total_files = self._build_size_map_optimized()
+            self.stats['total_files'] = total_files
 
             if total_files == 0:
                 self._log("❌ هیچ فایلی برای پردازش یافت نشد")
-                return []
+                return []  # ✅ بازگشت لیست خالی
 
             # Only process files that have size duplicates
             candidate_files = []
@@ -173,11 +192,11 @@ class FileFinder:
 
             if not candidate_files:
                 self._log("✅ هیچ فایل کاندیدی برای بررسی هش یافت نشد")
-                return []
+                return []  # ✅ بازگشت لیست خالی
 
             # Process files in parallel with progress reporting
             file_hashes = {}
-            last_update = time.time()
+            hash_start_time = time.time()
 
             # محاسبه تعداد workerها
             cpu_count = os.cpu_count() or 1
@@ -198,22 +217,36 @@ class FileFinder:
                             file_hash, file_path = future.result(timeout=30)
                             if file_hash and file_path:
                                 file_hashes.setdefault(file_hash, []).append(file_path)
+                                self.stats['files_processed'] += 1
                         except Exception as e:
                             self.logger.warning(f"خطا در پردازش فایل: {e}")
 
                         pbar.update(1)
 
-                        # آپدیت UI هر 0.5 ثانیه
+                        # ✅ آپدیت UI هر 0.5 ثانیه (حل مشکل last_update_time)
                         current_time = time.time()
-                        if current_time - last_update > 0.5:
+                        if current_time - self.last_update_time > 0.5:
                             speed = pbar.n / (current_time - start_time)
                             duplicates = sum(1 for group in file_hashes.values() if len(group) > 1)
-                            self._update_ui(len(candidate_files), pbar.n, speed, duplicates,
-                                            f"پردازش هش: {pbar.n}/{len(candidate_files)}")
-                            last_update = current_time
+
+                            if self.ui_update_callback:
+                                wx.CallAfter(self.ui_update_callback, {
+                                    'total_files': len(candidate_files),
+                                    'scanned_files': pbar.n,
+                                    'speed': speed,
+                                    'remaining': len(candidate_files) - pbar.n,
+                                    'percentage': (pbar.n / len(candidate_files)) * 100,
+                                    'duplicates': duplicates,
+                                    'message': f"پردازش شده: {pbar.n}/{len(candidate_files)} | سرعت: {speed:.1f} فایل/ثانیه",
+                                    'status': f"پردازش هش: {pbar.n}/{len(candidate_files)}"
+                                })
+
+                            self.last_update_time = current_time
 
             # Final results
             duplicate_groups = [group for group in file_hashes.values() if len(group) > 1]
+            self.stats['groups_found'] = len(duplicate_groups)
+            self.stats['hash_time'] = time.time() - hash_start_time
 
             # لاگ‌گیری نتایج
             elapsed_time = time.time() - start_time
@@ -224,7 +257,16 @@ class FileFinder:
                 total_duplicates = sum(len(g) - 1 for g in duplicate_groups)
                 self._log(f"🗑️  تعداد فایل‌های تکراری قابل حذف: {total_duplicates}")
 
-            return duplicate_groups
+            # آپدیت stats نهایی
+            self.stats['total_time'] = elapsed_time
+            self.stats['files_per_second'] = (
+                self.stats['files_processed'] / elapsed_time
+                if elapsed_time > 0 else 0
+            )
+
+            self._log(f"📊 آمار عملکرد: {self.stats}")
+
+            return duplicate_groups  # ✅ بازگشت صحیح
 
         except Exception as e:
             self._log(f"❌ خطا در فرآیند یافتن فایل‌های تکراری: {str(e)}", 'error')

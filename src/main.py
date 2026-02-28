@@ -8,12 +8,14 @@ from src2.create_other_folders import making_folders
 from src3.similar_files_frame import SimilarFilesFrame
 from src3.settings_dialog import SimilarFilesSettingsDialog
 from log_manager import log_manager
+from config import config  # ✅ اضافه کردن import
+
 
 logger = log_manager.get_logger("main")
 log_manager.log_startup()
 
-FFMPEG_PATH = r"D:\000_projects\librareis\ffmpeg\bin\ffmpeg.exe"
-finding_corrupted_files = False  # پیش‌فرض غیرفعال برای سرعت بیشتر
+FFMPEG_PATH = config.get("ffmpeg_path")  # ✅
+finding_corrupted_files = config.get("finding_corrupted_files")  # ✅
 
 
 def change_folder_permissions(folder_path):
@@ -113,10 +115,20 @@ def show_method_selection_dialog(parent, folder_path):
     return result["method"] if dlg.ShowModal() == wx.ID_OK else None
 
 
+def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
+    """مدیریت خطاهای unhandled"""
+
+    logger = log_manager.get_logger("unhandled")
+
+    logger.critical("خطای unhandled",
+                    exc_info=(exc_type, exc_value, exc_traceback))
+
 def main():
+
     try:
         logger.info("برنامه در حال راه‌اندازی...")
         app = wx.App(False)
+
 
         # نمایش دیالوگ انتخاب پوشه
         dialog = wx.DirDialog(None, "لطفاً یک پوشه را انتخاب کنید",
@@ -231,6 +243,7 @@ def main():
         traceback.print_exc()
     finally:
         log_manager.log_shutdown()
+
 
 
 if __name__ == "__main__":

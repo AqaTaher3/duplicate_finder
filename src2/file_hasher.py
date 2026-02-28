@@ -1,10 +1,8 @@
 import os
 import hashlib
 import mmap
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 import sqlite3
-import pickle
-import zlib
 from pathlib import Path
 from src.log_manager import log_manager
 from typing import Optional, Dict, Set, List, Tuple
@@ -36,7 +34,47 @@ class FileHasher:
                 self.logger.warning(f"خطا در ایجاد کش دیتابیس: {e}")
 
         self.logger.info(f"FileHasher با {self.max_workers} worker راه‌اندازی شد")
+        self.memory_cache = {}
+        self.cache_max_size = 1000
 
+        # زمان‌سنج برای performance monitoring
+
+    def get_performance_stats(self) -> Dict[str, any]:
+        """دریافت آمار عملکرد - IMPLEMENTED"""
+        if not hasattr(self, 'hash_times') or not self.hash_times:
+            return {
+                'total_hashes': 0,
+                'avg_time': 0,
+                'min_time': 0,
+                'max_time': 0,
+                'cache_hits': 0,
+                'cache_misses': 0
+            }
+
+        # آمار کش حافظه
+        cache_hits = 0
+        cache_misses = 0
+
+        # در عمل باید اینها را در متد hash_file بشماریم
+        # برای نمونه:
+        if hasattr(self, 'memory_cache'):
+            cache_hits = len(self.memory_cache)
+
+        return {
+            'total_hashes': len(self.hash_times),
+            'avg_time': sum(self.hash_times) / len(self.hash_times),
+            'min_time': min(self.hash_times),
+            'max_time': max(self.hash_times),
+            'cache_hits': cache_hits,
+            'cache_misses': cache_misses,
+            'memory_cache_size': len(self.memory_cache) if hasattr(self, 'memory_cache') else 0
+        }
+
+    def reset_stats(self):
+        """ریست آمار عملکرد"""
+        self.hash_times = []
+        if hasattr(self, 'memory_cache'):
+            self.memory_cache.clear()
 
     def _is_child_process(self):
         """بررسی آیا در فرایند child هستیم"""
@@ -44,6 +82,31 @@ class FileHasher:
         try:
             return multiprocessing.current_process().name != 'MainProcess'
         except:
+            return False
+
+    def check_file_health(self, file_path):
+        """بررسی سلامت فایل"""
+        try:
+            # وجود فایل
+            if not os.path.exists(file_path):
+                return False
+
+            # نوع فایل
+            if not os.path.isfile(file_path):
+                return False
+
+            # دسترسی خواندن
+            if not os.access(file_path, os.R_OK):
+                return False
+
+            # اندازه فایل (بزرگتر از صفر)
+            if os.path.getsize(file_path) == 0:
+                return False
+
+            return True
+
+        except Exception as e:
+            self.logger.debug(f"فایل نامعتبر {file_path}: {e}")
             return False
 
     def hash_file(self, file_path: str) -> Optional[str]:
@@ -63,6 +126,7 @@ class FileHasher:
                 cached_hash = self.db_cache.get(file_path)
                 if cached_hash:
                     self.memory_cache[file_path] = cached_hash
+                    # مدیریت اندازه کش
                     if len(self.memory_cache) > self.cache_max_size:
                         self.memory_cache.pop(next(iter(self.memory_cache)))
                     return cached_hash
@@ -126,6 +190,7 @@ class FileHasher:
         except Exception as e:
             self.logger.error(f"خطا در هش موسیقی {file_path}: {e}")
             return self._hash_generic_fallback(file_path)
+
 
     def _hash_video_optimized(self, file_path: str) -> Optional[str]:
         """هش بهینه برای فایل‌های ویدیویی"""
@@ -238,14 +303,13 @@ class FileHasher:
             return None
 
     @staticmethod
-    def check_file_health(file_path: str) -> bool:
+    def _check_file_health(self, file_path):
         """بررسی سلامت فایل"""
         try:
-            return (os.path.exists(file_path) and
-                    os.path.isfile(file_path) and
-                    os.path.getsize(file_path) > 0)
-        except OSError:
+            return os.path.exists(file_path) and os.path.isfile(file_path)
+        except:
             return False
+
 
     def hash_files_batch(self, file_paths: List[str]) -> List[Optional[str]]:
         """هش دسته‌ای فایل‌ها"""

@@ -115,7 +115,7 @@ def find_empty_folders(directory):
 
 # تست تابع
 if __name__ == "__main__":
-    test_dir = r"C:\Users\HP\Music\Cal"
+    test_dir = r"D:\English"
 
     if os.path.exists(test_dir):
         print(f"🔍 بررسی پوشه: {test_dir}")

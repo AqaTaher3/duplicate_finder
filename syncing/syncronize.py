@@ -10,6 +10,9 @@ import math
 import json
 import xxhash
 import ctypes
+from src2.delete_empty_folders import delete_empty_folders
+
+
 class SmartMusicSync:
     STATE_FILENAME = ".sync_state.json"
 
@@ -292,7 +295,7 @@ class SmartMusicSync:
                 return False
 
     def sync_files(self):
-        self.stats['start_time'] = time.time()
+        # self.stats['start_time'] = time.time()
         self.log_message(f"شروع سینک از {self.source_dir} به {self.dest_dir}")
         if not self.is_admin():
             print("⚠️  توجه: برنامه بدون دسترسی ادمین اجرا شده.")
@@ -401,7 +404,8 @@ class SmartMusicSync:
 
     def show_final_stats(self):
         end_time = time.time()
-        duration = end_time - self.stats['start_time']
+        # duration = end_time - self.stats['start_time']
+        duration = end_time - time.time()
 
         print("═" * 60)
         print("📈 آمار نهایی سینک")
@@ -431,25 +435,18 @@ class SmartMusicSync:
 
 
 def main():
-    source_dir = "Z:/Music"
-    dest_dir = "D:/"
-
-    if not os.path.exists(source_dir):
-        print(f"❌ پوشه منبع وجود ندارد: {source_dir}")
-        return
-
-    if not os.path.exists(dest_dir):
-        print(f"❌ پوشه مقصد وجود ندارد: {dest_dir}")
-        return
+    source_dir = r"Z:/Music"
+    dest_dir = r"E:/"
 
     exclude_formats = [
         ".txt", ".jpg", ".png", ".zip",
         ".dat", ".mp4", ".mpg", ".mkv", ".wmv",
         ".ts", ".avi", ".flv", ".3gp",
-        ".mov", ".m4v", ".mpeg", ".vob"
+        ".mov", ".m4v", ".mpeg", ".vob", "mpeg"
     ]
 
-    exclude_dir_substrings = ["55", "temp", "dontcopy"]
+    exclude_dir_substrings = ["temp", "dontcopy",
+                              "000", "Zont_copy"]
 
     print("═" * 60)
     print("🎵 سینک هوشمند فایل‌ها - نسخه سریع با پردازش موازی")
@@ -460,6 +457,7 @@ def main():
     print("═" * 60)
     print("🚀 شروع فرآیند سینک...")
 
+    delete_empty_folders(dest_dir, dry_run=False, verbose=True)
     sync = SmartMusicSync(
         source_dir, dest_dir,
         exclude_ext=exclude_formats,
@@ -467,6 +465,8 @@ def main():
         max_workers=4  # تعداد threadها برای پردازش موازی
     )
     sync.sync_files()
+    delete_empty_folders(dest_dir, dry_run=False, verbose=True)
+    delete_empty_folders(source_dir, dry_run=False, verbose=True)
 
 
 if __name__ == "__main__":

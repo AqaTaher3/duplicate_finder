@@ -165,6 +165,26 @@ class LogManager:
         self.logger.info(f"System Info: {system_info}")
         self.logger.info("=" * 50)
 
+    def get_child_logger(self, module_name=None):
+        """دریافت logger برای فرایندهای child"""
+        logger_name = f"{self.app_name}.child"
+        if module_name:
+            logger_name = f"{logger_name}.{module_name}"
+
+        logger = logging.getLogger(logger_name)
+
+        # اگر handler ندارد، اضافه کن
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                '[%(asctime)s] [%(levelname)s] [%(processName)s] - %(message)s',
+                datefmt='%H:%M:%S'
+            )
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+
+        return logger
+
     def log_shutdown(self):
         """لاگ‌گیری خاموشی برنامه - فقط در فرایند اصلی"""
         if not self._is_main_process():

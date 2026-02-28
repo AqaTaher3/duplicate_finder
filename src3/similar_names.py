@@ -3,10 +3,12 @@ import re
 from difflib import SequenceMatcher
 from concurrent.futures import ThreadPoolExecutor
 import collections
-from typing import List, Dict, Tuple, Set, Any
+from typing import List, Dict, Set, Any
 import wx
 from dataclasses import dataclass
 from pathlib import Path
+from src.config import config  # ✅ اضافه کردن import
+
 
 exclude_extensions={"jpg", "png", "gif", "mp4", "jpeg"}
 
@@ -60,9 +62,8 @@ class SimilarNameFinder:
             'vol', 'volume', 'part', 'chapter'
         }
 
-        self.exclude_extensions = {
-            ext.lower().lstrip('.') for ext in (exclude_extensions or [])
-        }
+        default_excluded = set(config.get("excluded_extensions", []))
+        self.exclude_extensions = exclude_extensions or default_excluded
 
     def _is_numeric_name(self, name: str) -> bool:
         """
@@ -127,32 +128,30 @@ class SimilarNameFinder:
         return normalized
     def _calculate_similarity(self, str1: str, str2: str) -> float:
         """محاسبه شباهت بین دو رشته"""
-        # استفاده از SequenceMatcher با تنظیمات بهینه
         return SequenceMatcher(None, str1, str2).ratio()
 
-    def _get_file_info(self, file_path: str) -> FileInfo:
+    def _get_file_info(self, file_path: str):
         """دریافت اطلاعات فایل"""
         try:
             path_obj = Path(file_path)
+
+            # بررسی وجود فایل
+            if not path_obj.exists():
+                return None
+
+            # نام فایل
             filename = path_obj.name.lower()
 
             # ❌ فیلتر pattern‌های track-like و نام‌های بی‌معنی
             blocked_patterns = [
-                # الگوهای track
                 r'audio\s*track\s*\d+',
                 r'track\s*\d+',
                 r'\d+\s*[-_]\s*track',
                 r'\d+\s*[-_]\s*audiotrack',
-
-                # الگوهای song
                 r'\d+\s*[-_]\s*song',
                 r'song\s*\d+',
-
-                # الگوهای music
                 r'\d+\s*[-_]\s*music',
                 r'music\s*\d+',
-
-                # فایل‌های system
                 r'^albumart',
                 r'^folder',
                 r'^desktop',
@@ -161,7 +160,7 @@ class SimilarNameFinder:
             ]
 
             for pattern in blocked_patterns:
-                if re.search(pattern, filename):
+                if re.search(pattern, filename, re.IGNORECASE):
                     return None  # ❌ این فایل را نادیده بگیر
 
             # فیلتر پسوند
@@ -196,11 +195,12 @@ class SimilarNameFinder:
             if self.use_cache:
                 self.file_cache[file_path] = file_info
 
-            return file_info
+            return file_info  # ✅ بازگشت FileInfo
 
         except Exception as e:
             print(f"❌ خطا در دریافت اطلاعات {file_path}: {e}")
-            return None
+            return None  # ✅ بازگشت None در صورت خطا
+
     def _find_similar_groups(self, files_info: List[FileInfo]) -> List[List[str]]:
         """یافتن گروه‌های مشابه"""
         # گروه‌بندی بر اساس نام نرمال شده
@@ -254,6 +254,7 @@ class SimilarNameFinder:
                     similar_groups.append(current_group)
 
         return similar_groups
+
     def find_similar_files(self, progress_callback=None) -> List[List[str]]:
         """یافتن فایل‌های با نام‌های مشابه"""
         all_files = []

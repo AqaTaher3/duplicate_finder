@@ -92,6 +92,32 @@ class FileHandler:
 
         return deleted_count
 
+    def _apply_auto_deletion(self):
+        """اعمال حذف خودکار"""
+        if not self.file_sets:
+            return
+
+        # منطق حذف خودکار (مثال)
+        to_delete = []
+        for group in self.file_sets:
+            if len(group) > 1:
+                # استراتژی: اولین فایل را نگه دار، بقیه حذف شوند
+                to_delete.extend(group[1:])
+
+        if to_delete:
+            self._safe_delete_files(to_delete, use_recycle_bin=False)
+
+    def _force_delete_file(self, file_path):
+        """حذف اجباری فایل"""
+        try:
+            # تغییر permission
+            os.chmod(file_path, stat.S_IWRITE)
+            os.remove(file_path)
+            return True
+        except Exception as e:
+            self.logger.error(f"حذف اجباری ناموفق: {e}")
+            return False
+
     def _create_backup(self, file_path):
         """ایجاد بک‌آپ از فایل قبل از حذف"""
         try:
@@ -183,22 +209,49 @@ class FileHandler:
             self.logger.error(f"خطا در بارگذاری فایل‌ها: {e}")
             raise
 
-
     def undo_last_deletion(self):
-        """بازگرداندن آخرین حذف"""
+        """بازگرداندن آخرین حذف - IMPLEMENTED"""
         if not self.successful_deletions:
             return False, "هیچ حذفی برای بازگرداندن وجود ندارد"
 
         try:
-            file_path, backup_path = self.successful_deletions.pop()
-            success, message = self.restore_from_backup(backup_path, file_path)
+            # گرفتن آخرین حذف
+            file_path, backup_path = self.successful_deletions[-1]
 
-            if success:
-                # حذف از لیست خطاها اگر وجود داشت
-                self.failed_deletions = [f for f in self.failed_deletions if f[0] != file_path]
-                self.logger.info(f"بازگرداندن موفق: {os.path.basename(file_path)}")
+            # بررسی وجود بک‌آپ
+            if not backup_path or not os.path.exists(backup_path):
+                return False, "فایل بک‌آپ یافت نشد"
 
-            return success, message
+            # ایجاد پوشه مقصد اگر وجود ندارد
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            # کپی بک‌آپ به محل اصلی
+            shutil.copy2(backup_path, file_path)
+
+            # حذف از لیست موفق‌ها
+            self.successful_deletions.pop()
+
+            # حذف فایل بک‌آپ (اختیاری)
+            try:
+                os.remove(backup_path)
+            except:
+                pass
+
+            # اضافه کردن به file_sets اگر لازم است
+            file_added = False
+            for group in self.file_sets:
+                if any(f in backup_path for f in group):  # اگر مربوط به این گروه است
+                    group.append(file_path)
+                    file_added = True
+                    break
+
+            if not file_added:
+                # ایجاد گروه جدید
+                self.file_sets.append([file_path])
+
+            self.logger.info(f"✅ بازگردانی موفق: {os.path.basename(file_path)}")
+            return True, "بازگردانی موفق"
+
         except Exception as e:
-            self.logger.error(f"خطا در بازگرداندن: {e}")
+            self.logger.error(f"❌ خطا در بازگردانی: {e}")
             return False, str(e)
