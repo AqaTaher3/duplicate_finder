@@ -435,8 +435,8 @@ class SmartMusicSync:
 
 
 def main():
-    source_dir = r"Z:/Music"
-    dest_dir = r"E:/"
+    source_dir = r"K:/Music"
+    dest_dir = r"D:/"
 
     exclude_formats = [
         ".txt", ".jpg", ".png", ".zip",

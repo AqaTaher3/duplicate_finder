@@ -5,12 +5,10 @@ import random
 import threading
 from src.log_manager import log_manager
 
-json_log_path = 'src/log_file_not_found.json'
-
 
 class FileFinderFrame(wx.Frame):
     def __init__(self, parent, title, folder_path, file_handler):
-        super().__init__(parent, title=title, size=(1400, 800))  # ✅ افزایش سایز پنجره
+        super().__init__(parent, title=title, size=(1400, 800))
 
         self.logger = log_manager.get_logger("FileFinderFrame")
         self.logger.info(f"ایجاد پنجره FileFinderFrame برای: {folder_path}")
@@ -22,12 +20,10 @@ class FileFinderFrame(wx.Frame):
         self.selected_files = []
         self.is_processing = False
 
-        # ✅ تغییر: پس‌زمینه روشن‌تر
         self.SetBackgroundColour(wx.Colour(240, 245, 250))
         self.panel = wx.Panel(self)
         self.panel.SetBackgroundColour(wx.Colour(245, 250, 255))
 
-        # ✅ تغییر: فونت بزرگتر
         default_font = wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.SetFont(default_font)
 
@@ -37,24 +33,22 @@ class FileFinderFrame(wx.Frame):
         self.status_bar = self.CreateStatusBar(2)
         self.status_bar.SetStatusWidths([-3, -1])
         self.status_bar.SetStatusText("آماده", 0)
-
-        # ✅ تغییر: رنگ متن نوار وضعیت
         self.status_bar.SetBackgroundColour(wx.Colour(220, 230, 240))
         self.status_bar.SetForegroundColour(wx.Colour(50, 50, 50))
 
         # نوار پیشرفت
-        self.progress_bar = wx.Gauge(self.panel, range=100, size=(300, 25))  # ✅ بزرگتر
+        self.progress_bar = wx.Gauge(self.panel, range=100, size=(300, 25))
         self.progress_bar.Hide()
         self.vbox.Add(self.progress_bar, 0, wx.ALL | wx.CENTER, 5)
 
         self.status_label = wx.StaticText(self.panel, label="در حال بارگذاری فایل‌ها...")
-        self.status_label.SetForegroundColour(wx.Colour(50, 50, 50))  # ✅ متن تیره‌تر
+        self.status_label.SetForegroundColour(wx.Colour(50, 50, 50))
         self.status_label.SetFont(wx.Font(13, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD))
         self.vbox.Add(self.status_label, 0, wx.ALL | wx.CENTER, 10)
 
         # کنترل‌های استراتژی
         self.strategy_panel = wx.Panel(self.panel)
-        self.strategy_panel.SetBackgroundColour(wx.Colour(220, 230, 240))  # ✅ روشن‌تر
+        self.strategy_panel.SetBackgroundColour(wx.Colour(220, 230, 240))
         strategy_sizer = wx.BoxSizer(wx.HORIZONTAL)
 
         self.cb_priority_old = wx.CheckBox(self.strategy_panel, label="حذف قدیمی‌ترها (نگهداری جدیدتر)")
@@ -65,7 +59,6 @@ class FileFinderFrame(wx.Frame):
         self.cb_priority_new.Bind(wx.EVT_CHECKBOX, self.on_new_checkbox)
         self.cb_random.Bind(wx.EVT_CHECKBOX, self.on_random_checkbox)
 
-        # ✅ تغییر: فونت بزرگتر برای چک‌باکس‌ها
         checkbox_font = wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.cb_priority_old.SetFont(checkbox_font)
         self.cb_priority_new.SetFont(checkbox_font)
@@ -75,7 +68,6 @@ class FileFinderFrame(wx.Frame):
         strategy_sizer.Add(self.cb_priority_new, 0, wx.ALL | wx.CENTER, 5)
         strategy_sizer.Add(self.cb_random, 0, wx.ALL | wx.CENTER, 5)
 
-        # تنظیمات حذف
         self.cb_use_recycle = wx.CheckBox(self.strategy_panel, label="استفاده از سطل بازیافت")
         self.cb_use_recycle.SetValue(True)
         self.cb_use_recycle.SetFont(checkbox_font)
@@ -84,28 +76,27 @@ class FileFinderFrame(wx.Frame):
         self.strategy_panel.SetSizer(strategy_sizer)
         self.vbox.Add(self.strategy_panel, 0, wx.ALL | wx.EXPAND, 5)
 
-        # ✅ تغییر: استفاده از ListCtrl با ستون‌های متعدد
+        # ✅ اصلاح: استفاده از wx.ListCtrl با مدیریت چک‌باکس دستی
         self.file_list = wx.ListCtrl(self.panel, style=wx.LC_REPORT | wx.LC_SINGLE_SEL | wx.BORDER_SUNKEN,
                                      size=(1300, 400))
-        self.file_list.SetBackgroundColour(wx.Colour(255, 255, 255))  # ✅ سفید
+        self.file_list.SetBackgroundColour(wx.Colour(255, 255, 255))
         self.file_list.SetForegroundColour(wx.Colour(30, 30, 30))
 
-        # ✅ تنظیم فونت بزرگتر برای لیست
         list_font = wx.Font(11, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.file_list.SetFont(list_font)
 
-        # ✅ اضافه کردن ستون‌ها
-        self.file_list.InsertColumn(0, "انتخاب", width=50)
+        # ستون‌ها: (ستون اول برای چک‌باکس)
+        self.file_list.InsertColumn(0, "✓", width=40)
         self.file_list.InsertColumn(1, "نام فایل", width=250)
         self.file_list.InsertColumn(2, "سایز", width=100)
         self.file_list.InsertColumn(3, "تاریخ ایجاد", width=140)
         self.file_list.InsertColumn(4, "تاریخ تغییر", width=140)
         self.file_list.InsertColumn(5, "آدرس", width=600)
 
-        # ✅ رویداد برای کلیک
+        # رویدادهای ListCtrl
         self.file_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_list_item_selected)
         self.file_list.Bind(wx.EVT_LIST_ITEM_DESELECTED, self.on_list_item_deselected)
-        self.file_list.Bind(wx.EVT_LEFT_DOWN, self.on_list_click)  # برای مدیریت چک‌باکس
+        self.file_list.Bind(wx.EVT_LEFT_DOWN, self.on_list_click)
 
         self.vbox.Add(self.file_list, 1, wx.ALL | wx.EXPAND, 10)
 
@@ -185,17 +176,14 @@ class FileFinderFrame(wx.Frame):
 
         self.vbox.Add(info_sizer, 0, wx.ALL | wx.CENTER, 10)
 
-        # راهنما
         help_text = wx.StaticText(self.panel,
-                                  label="راهنما: کلیک روی سطر اول برای انتخاب/لغو انتخاب • F1 = راهنمای کامل")
+                                  label="راهنما: کلیک روی ستون اول برای انتخاب/لغو انتخاب • F1 = راهنمای کامل")
         help_text.SetForegroundColour(wx.Colour(100, 100, 100))
         help_text.SetFont(wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_ITALIC, wx.FONTWEIGHT_NORMAL))
         self.vbox.Add(help_text, 0, wx.ALL | wx.CENTER, 5)
 
-        # رویدادهای کلید
         self.Bind(wx.EVT_KEY_DOWN, self.on_frame_key)
 
-        # آیکون
         try:
             if os.path.exists("icon.ico"):
                 self.SetIcon(wx.Icon("icon.ico", wx.BITMAP_TYPE_ICO))
@@ -206,14 +194,13 @@ class FileFinderFrame(wx.Frame):
         self.Center()
         self.Show()
 
-        # بارگذاری اولیه در پس‌زمینه
         self.load_files_background()
 
-    # ---------- متدهای جدید برای مدیریت ListCtrl ----------
+    # ---------- مدیریت ListCtrl ----------
 
     def on_list_item_selected(self, event):
         """وقتی یک آیتم انتخاب شد"""
-        pass  # انتخاب از طریق چک‌باکس مدیریت می‌شود
+        pass
 
     def on_list_item_deselected(self, event):
         """وقتی انتخاب یک آیتم لغو شد"""
@@ -225,12 +212,10 @@ class FileFinderFrame(wx.Frame):
         item, flags = self.file_list.HitTest((x, y))
 
         if item >= 0:
-            # بررسی آیا روی ستون اول (چک‌باکس) کلیک شده
             rect = self.file_list.GetItemRect(item)
-            checkbox_width = 20  # عرض تقریبی ناحیه چک‌باکس
+            checkbox_width = 40  # عرض ستون اول
 
             if x - rect.x < checkbox_width:
-                # تغییر وضعیت چک‌باکس
                 self.toggle_checkbox(item)
 
         event.Skip()
@@ -245,18 +230,15 @@ class FileFinderFrame(wx.Frame):
         if item_index < len(file_group):
             file_path = file_group[item_index]
 
-            # بررسی وضعیت فعلی
             current_state = self.file_list.GetItem(item_index, 0).GetText()
             is_checked = current_state == "✓"
 
             if is_checked:
-                # لغو انتخاب
                 self.file_list.SetItem(item_index, 0, "")
                 if file_path in self.selected_files:
                     self.selected_files.remove(file_path)
                     self.logger.info(f"❌ لغو انتخاب: {os.path.basename(file_path)}")
             else:
-                # انتخاب
                 self.file_list.SetItem(item_index, 0, "✓")
                 if file_path not in self.selected_files:
                     self.selected_files.append(file_path)
@@ -270,11 +252,12 @@ class FileFinderFrame(wx.Frame):
             return
 
         file_group = self.files_list[self.current_set]
+        self.selected_files = []
 
         for i in range(len(file_group)):
             self.file_list.SetItem(i, 0, "✓")
+            self.selected_files.append(file_group[i])
 
-        self.selected_files = list(file_group)
         self.update_selected_count()
         self.logger.info(f"✅ انتخاب همه: {len(self.selected_files)} فایل")
 
@@ -291,7 +274,7 @@ class FileFinderFrame(wx.Frame):
         """پاک کردن جدول"""
         self.file_list.DeleteAllItems()
 
-    # ---------- متدهای اصلی با تغییرات ----------
+    # ---------- متدهای اصلی ----------
 
     def on_old_checkbox(self, event):
         if self.cb_priority_old.GetValue():
@@ -349,13 +332,6 @@ class FileFinderFrame(wx.Frame):
         """به‌روزرسانی نوار وضعیت"""
         self.status_bar.SetStatusText(message, field)
 
-    def on_context_menu(self, event):
-        """منوی راست کلیک"""
-        menu = wx.Menu()
-        # آیتم‌های منو...
-        self.PopupMenu(menu)
-        menu.Destroy()
-
     def on_frame_key(self, event):
         """مدیریت کلیدهای پنجره"""
         key_code = event.GetKeyCode()
@@ -387,14 +363,18 @@ class FileFinderFrame(wx.Frame):
         event.Skip()
 
     def on_delete_selected(self, event):
-        """حذف فایل‌های انتخاب شده"""
+        """انتقال فایل‌های انتخاب شده به backup_deleted"""
         if not self.selected_files:
             wx.MessageBox("هیچ فایلی انتخاب نشده است!", "خطا", wx.OK | wx.ICON_WARNING)
             return
 
-        # تأیید حذف
-        confirm_msg = f"آیا از حذف {len(self.selected_files)} فایل انتخاب شده مطمئن هستید؟"
-        dlg = wx.MessageDialog(self, confirm_msg, "تأیید حذف",
+        # تأیید انتقال
+        confirm_msg = f"آیا از انتقال {len(self.selected_files)} فایل به پوشه backup_deleted مطمئن هستید؟\n\n"
+        confirm_msg += "⚠️ این فایل‌ها به پوشه زیر منتقل می‌شوند:\n"
+        confirm_msg += f"📁 {self.file_handler.backup_deleted}\n\n"
+        confirm_msg += "در صورت وجود فایل تکراری، نام جدید اضافه می‌شود."
+
+        dlg = wx.MessageDialog(self, confirm_msg, "تأیید انتقال",
                                wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING)
 
         if dlg.ShowModal() != wx.ID_YES:
@@ -402,16 +382,19 @@ class FileFinderFrame(wx.Frame):
             return
         dlg.Destroy()
 
-        # حذف فایل‌ها
-        deleted_count = 0
+        # انتقال فایل‌ها
+        moved_count = 0
         for file_path in self.selected_files:
             try:
                 if os.path.exists(file_path):
-                    os.remove(file_path)
-                    deleted_count += 1
-                    self.logger.info(f"✅ حذف شد: {os.path.basename(file_path)}")
+                    success, message = self.file_handler._move_to_backup_deleted(file_path)
+                    if success:
+                        moved_count += 1
+                        self.logger.info(f"✅ انتقال: {os.path.basename(file_path)}")
+                    else:
+                        self.logger.error(f"❌ خطا در انتقال {file_path}: {message}")
             except Exception as e:
-                self.logger.error(f"❌ خطا در حذف {file_path}: {e}")
+                self.logger.error(f"❌ خطا در انتقال {file_path}: {e}")
 
         # پاک کردن لیست انتخاب‌ها
         self.selected_files = []
@@ -420,7 +403,12 @@ class FileFinderFrame(wx.Frame):
         self.load_files_background()
 
         # نمایش نتیجه
-        wx.MessageBox(f"{deleted_count} فایل حذف شد", "نتیجه", wx.OK | wx.ICON_INFORMATION)
+        wx.MessageBox(
+            f"{moved_count} فایل به پوشه backup_deleted منتقل شد.\n\n"
+            f"📁 مسیر: {self.file_handler.backup_deleted}",
+            "نتیجه انتقال",
+            wx.OK | wx.ICON_INFORMATION
+        )
 
     def on_apply_to_all(self, event):
         """اعمال استراتژی انتخاب شده روی تمام گروه‌ها"""
@@ -432,14 +420,11 @@ class FileFinderFrame(wx.Frame):
                           wx.ICON_WARNING)
             return
 
-        # پاک کردن همه انتخاب‌های قبلی برای جلوگیری از تداخل
         self.selected_files = []
 
-        # اعمال روی تک تک گروه‌ها
         for group in self.files_list:
             self.apply_strategy_logic(group)
 
-        # به‌روزرسانی نمایش
         self.show_current_set()
         self.update_selected_count()
 
@@ -491,7 +476,7 @@ class FileFinderFrame(wx.Frame):
 
     def show_current_set(self):
         """نمایش گروه فعلی با اطلاعات کامل"""
-        self.file_list.DeleteAllItems()  # پاک کردن موارد قبلی
+        self.file_list.DeleteAllItems()
 
         if not self.files_list or self.current_set >= len(self.files_list):
             self.status_label.SetLabel("کار تمام شد!")
@@ -499,28 +484,22 @@ class FileFinderFrame(wx.Frame):
 
         file_group = self.files_list[self.current_set]
 
-        # اعمال استراتژی اگر انتخاب شده
         if self.cb_priority_new.GetValue() or self.cb_priority_old.GetValue() or self.cb_random.GetValue():
             self.apply_strategy_logic(file_group)
 
-        # اضافه کردن فایل‌ها به لیست با اطلاعات کامل
         for i, file_path in enumerate(file_group):
             filename = os.path.basename(file_path)
 
             try:
-                # اطلاعات سایز
                 size = os.path.getsize(file_path)
                 size_str = self.format_file_size(size)
 
-                # اطلاعات تاریخ ایجاد (ctime)
                 ctime = os.path.getctime(file_path)
                 cdate_str = datetime.datetime.fromtimestamp(ctime).strftime('%Y-%m-%d %H:%M')
 
-                # اطلاعات تاریخ تغییر (mtime)
                 mtime = os.path.getmtime(file_path)
                 mdate_str = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')
 
-                # مسیر کامل
                 full_path = file_path
 
             except Exception as e:
@@ -529,21 +508,17 @@ class FileFinderFrame(wx.Frame):
                 mdate_str = "نامشخص"
                 full_path = file_path
 
-            # اضافه کردن ردیف به لیست
-            index = self.file_list.InsertItem(i, "")  # ستون اول (چک‌باکس) خالی
+            index = self.file_list.InsertItem(i, "")
 
-            # پر کردن سایر ستون‌ها
             self.file_list.SetItem(index, 1, filename)
             self.file_list.SetItem(index, 2, size_str)
             self.file_list.SetItem(index, 3, cdate_str)
             self.file_list.SetItem(index, 4, mdate_str)
             self.file_list.SetItem(index, 5, full_path)
 
-            # اگر فایل انتخاب شده بود، علامت ✓ بزن
             if file_path in self.selected_files:
                 self.file_list.SetItem(index, 0, "✓")
 
-        # آپدیت وضعیت
         remaining = len(self.files_list) - self.current_set - 1
         self.status_label.SetLabel(
             f"گروه {self.current_set + 1} از {len(self.files_list)} ({remaining} گروه باقی‌مانده)")
@@ -561,18 +536,15 @@ class FileFinderFrame(wx.Frame):
         if not file_group:
             return
 
-        # ابتدا تمام فایل‌های این گروه را از لیست انتخاب شده‌ها خارج می‌کنیم (ریست کردن گروه)
         for f in file_group:
             if f in self.selected_files:
                 self.selected_files.remove(f)
 
         files_to_select = []
 
-        # اگر هیچ استراتژی انتخاب نشده باشد، کاری نکن
         if not (self.cb_priority_new.GetValue() or self.cb_priority_old.GetValue() or self.cb_random.GetValue()):
             return
 
-        # دریافت زمان فایل‌ها
         files_with_time = []
         for f in file_group:
             try:
@@ -582,22 +554,18 @@ class FileFinderFrame(wx.Frame):
             files_with_time.append((f, mtime))
 
         if self.cb_priority_new.GetValue():
-            # حذف جدیدترها -> یعنی قدیمی‌ترین را نگه دار
             files_with_time.sort(key=lambda x: x[1])
             files_to_select = [x[0] for x in files_with_time[1:]]
 
         elif self.cb_priority_old.GetValue():
-            # حذف قدیمی‌ترها -> یعنی جدیدترین را نگه دار
             files_with_time.sort(key=lambda x: x[1], reverse=True)
             files_to_select = [x[0] for x in files_with_time[1:]]
 
         elif self.cb_random.GetValue():
-            # حذف تصادفی -> یکی را نگه دار
             if len(file_group) > 1:
                 keep_index = random.randint(0, len(file_group) - 1)
                 for i, f in enumerate(file_group):
                     if i != keep_index:
                         files_to_select.append(f)
 
-        # اضافه کردن به لیست اصلی انتخاب شده‌ها
         self.selected_files.extend(files_to_select)

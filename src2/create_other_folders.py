@@ -12,13 +12,14 @@ def making_folders(folder_selected):
         priority_folder = os.path.join(base_000, "PriorityFolder")
         corrupted_folder = os.path.join(base_000, "Corrupted_folder")
         keep_folder = os.path.join(base_000, "Keep_folder")
-        backup_deleted = os.path.join(base_000, "backup_deleted")
+        backup_deleted = os.path.join(priority_folder, "backup_deleted")
 
         folders_to_create = [
             (base_000, "پوشه پایه 000"),
             (priority_folder, "پوشه اولویت"),
             (corrupted_folder, "پوشه فایل‌های خراب"),
-            (keep_folder, "پوشه نگهداری")
+            (keep_folder, "پوشه نگهداری"),
+            (backup_deleted, "بکاپ حذفیات")
         ]
 
         for folder_path, folder_name in folders_to_create:
@@ -38,11 +39,14 @@ def making_folders(folder_selected):
             except Exception as e:
                 print(f"❌ خطای غیرمنتظره در ایجاد {folder_name}: {e}")
 
-        return [keep_folder, priority_folder, corrupted_folder]
+        return [keep_folder, priority_folder, backup_deleted, corrupted_folder]
 
     except Exception as e:
         print(f"❌ خطای شدید در ایجاد پوشه‌ها: {e}")
         # بازگرداندن پوشه‌هایی که ایجاد شده‌اند
-        return [keep_folder if 'keep_folder' in locals() and keep_folder else None,
-                priority_folder if 'priority_folder' in locals() and priority_folder else None,
-                corrupted_folder if 'corrupted_folder' in locals() and corrupted_folder else None]
+        return [
+            keep_folder if 'keep_folder' in locals() and keep_folder else None,
+            priority_folder if 'priority_folder' in locals() and priority_folder else None,
+            backup_deleted if 'backup_deleted' in locals() and backup_deleted else None,
+            corrupted_folder if 'corrupted_folder' in locals() and corrupted_folder else None
+        ]

@@ -3,8 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.db
-# C extensions
-*.so
+hash_cache.db
+src/hash_cache.db
 
 # Distribution / packaging
 .Python

@@ -13,7 +13,7 @@ from src.config import config  # ✅ اضافه کردن import
 class FileFinder:
     def __init__(self, folder_path, exclude_folders=None, progress_bar=None,
                  progress_label=None, log_callback=None, ui_update_callback=None,
-                 cache_file=None, batch_size=1000):
+                 cache_file=None, batch_size=1000, progress_callback=None):
         self.folder_path = folder_path
         self.exclude_folders = [os.path.normpath(f) for f in (exclude_folders or [])]
         self.progress_bar = progress_bar
@@ -23,13 +23,15 @@ class FileFinder:
         self.hasher = FileHasher()
         self.batch_size = batch_size or config.get("batch_size", 1000)
 
-        # لیست فرمت‌های قابل پردازش
         self.supported_extensions = set(config.get("supported_extensions", []))
 
         # ✅ اضافه کردن last_update_time
         self.last_update_time = time.time()
 
-        # ✅ اضافه کردن دیگر متغیرهای ضروری
+        # ✅ اضافه کردن hash_times برای FileHasher
+        self.hash_times = []
+
+        # ✅ اضافه کردن متغیرهای ضروری
         self.stats = {
             'total_files_scanned': 0,
             'files_processed': 0,
@@ -39,6 +41,16 @@ class FileFinder:
 
         self.logger = log_manager.get_logger("FileFinder")
         self.logger.info(f"FileFinder ساخته شد برای: {folder_path}")
+        self.progress_callback = progress_callback
+        self.logger = log_manager.get_logger("FileFinder")
+
+    def _report_progress(self, progress, status=None):
+        """گزارش پیشرفت به callback"""
+        if self.progress_callback:
+            try:
+                wx.CallAfter(self.progress_callback, progress, status)
+            except Exception as e:
+                self.logger.debug(f"خطا در گزارش پیشرفت: {e}")
 
     def _is_child_process(self):
         """بررسی آیا در فرایند child هستیم"""
@@ -96,25 +108,43 @@ class FileFinder:
             })
 
     def _build_size_map_optimized(self):
-        """ساخت نقشه سایز با کارایی بهتر"""
+        """ساخت نقشه سایز با کارایی بهتر و گزارش پیشرفت"""
         size_map = collections.defaultdict(list)
         total_files = 0
         supported_files = 0
 
         self._log("📂 در حال اسکن فایل‌ها...")
+        self._report_progress(5, "اسکن فایل‌ها...")
 
         start_time = time.time()
 
         try:
+            # ✅ شمارش سریع فایل‌ها برای پیشرفت دقیق
+            total_files_count = 0
+            self._report_progress(3, "شمارش فایل‌ها...")
+
             for root, dirs, files in os.walk(self.folder_path):
-                # فیلتر کردن پوشه‌ها در همان لحظه
+                dirs[:] = [d for d in dirs if not self._should_skip(os.path.join(root, d))]
+                if self._should_skip(root):
+                    continue
+                for filename in files:
+                    if self._is_supported_file(filename):
+                        total_files_count += 1
+
+            if total_files_count == 0:
+                self._report_progress(50, "هیچ فایل پشتیبانی شده‌ای یافت نشد")
+                return size_map, 0
+
+            self._report_progress(5, f"اسکن {total_files_count} فایل...")
+
+            processed = 0
+            for root, dirs, files in os.walk(self.folder_path):
                 dirs[:] = [d for d in dirs if not self._should_skip(os.path.join(root, d))]
 
                 if self._should_skip(root):
                     continue
 
                 for filename in files:
-                    # فیلتر فرمت‌های پشتیبانی شده
                     if not self._is_supported_file(filename):
                         continue
 
@@ -130,9 +160,16 @@ class FileFinder:
                     except OSError:
                         continue
 
+                    processed += 1
+                    # ✅ گزارش پیشرفت هر 50 فایل
+                    if processed % 50 == 0 and total_files_count > 0:
+                        progress = 5 + (processed / total_files_count) * 45  # 5% تا 50%
+                        self._report_progress(progress, f"اسکن: {processed}/{total_files_count}")
+                        wx.Yield()  # اجازه می‌دهد UI به‌روز شود
+
             elapsed = time.time() - start_time
             self._log(f"✅ اسکن فایل‌ها کامل شد. زمان: {elapsed:.2f} ثانیه")
-            self._log(f"📊 آمار: {total_files} فایل کل، {supported_files} فایل پشتیبانی شده")
+            self._report_progress(50, f"اسکن کامل شد: {total_files} فایل")
 
         except Exception as e:
             self._log(f"❌ خطا در اسکن فایل‌ها: {str(e)}", 'error')
@@ -157,11 +194,10 @@ class FileFinder:
         """Main method to find duplicate files"""
         start_time = time.time()
         self._log("🔍 شروع فرآیند یافتن فایل‌های تکراری...")
+        self._report_progress(0, "شروع پردازش...")
 
-        # ✅ ریست last_update_time
         self.last_update_time = start_time
 
-        # ریست آمار
         self.stats = {
             'total_files': 0,
             'files_processed': 0,
@@ -172,12 +208,14 @@ class FileFinder:
 
         try:
             # First pass - count files and build size map
+            self._report_progress(5, "ساخت نقشه سایز فایل‌ها...")
             size_map, total_files = self._build_size_map_optimized()
             self.stats['total_files'] = total_files
 
             if total_files == 0:
                 self._log("❌ هیچ فایلی برای پردازش یافت نشد")
-                return []  # ✅ بازگشت لیست خالی
+                self._report_progress(100, "هیچ فایلی یافت نشد")
+                return []
 
             # Only process files that have size duplicates
             candidate_files = []
@@ -189,87 +227,61 @@ class FileFinder:
                     duplicate_size_count += len(files)
 
             self._log(f"📊 فایل‌های کاندید: {len(candidate_files)} از {duplicate_size_count} فایل با سایز تکراری")
+            self._report_progress(55, f"یافت شد {len(candidate_files)} فایل کاندید")
 
             if not candidate_files:
                 self._log("✅ هیچ فایل کاندیدی برای بررسی هش یافت نشد")
-                return []  # ✅ بازگشت لیست خالی
+                self._report_progress(100, "هیچ تکراری یافت نشد")
+                return []
 
-            # Process files in parallel with progress reporting
+            # ✅ برای تست: از پردازش تک‌تردی استفاده کن (برای رفع مشکل Pickle)
+            self._report_progress(60, "شروع هش کردن فایل‌ها...")
+
             file_hashes = {}
             hash_start_time = time.time()
 
-            # محاسبه تعداد workerها
-            cpu_count = os.cpu_count() or 1
-            max_workers = min(cpu_count, 8)  # حداکثر 8 worker
+            total = len(candidate_files)
+            completed = 0
 
-            with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                process_func = functools.partial(self._process_file_wrapper)
+            # ✅ استفاده از پردازش تک‌تردی به جای Multiprocessing
+            for file_path in candidate_files:
+                try:
+                    file_hash = self.hasher.hash_file(file_path)
+                    if file_hash:
+                        file_hashes.setdefault(file_hash, []).append(file_path)
+                        self.stats['files_processed'] += 1
+                except Exception as e:
+                    self.logger.warning(f"خطا در پردازش فایل: {e}")
 
-                # ایجاد progress bar
-                with tqdm(total=len(candidate_files), desc="پردازش هش", unit="فایل",
-                          bar_format="{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{rate_fmt}]") as pbar:
+                completed += 1
 
-                    futures = {executor.submit(process_func, file_path): file_path
-                               for file_path in candidate_files}
-
-                    for future in as_completed(futures):
-                        try:
-                            file_hash, file_path = future.result(timeout=30)
-                            if file_hash and file_path:
-                                file_hashes.setdefault(file_hash, []).append(file_path)
-                                self.stats['files_processed'] += 1
-                        except Exception as e:
-                            self.logger.warning(f"خطا در پردازش فایل: {e}")
-
-                        pbar.update(1)
-
-                        # ✅ آپدیت UI هر 0.5 ثانیه (حل مشکل last_update_time)
-                        current_time = time.time()
-                        if current_time - self.last_update_time > 0.5:
-                            speed = pbar.n / (current_time - start_time)
-                            duplicates = sum(1 for group in file_hashes.values() if len(group) > 1)
-
-                            if self.ui_update_callback:
-                                wx.CallAfter(self.ui_update_callback, {
-                                    'total_files': len(candidate_files),
-                                    'scanned_files': pbar.n,
-                                    'speed': speed,
-                                    'remaining': len(candidate_files) - pbar.n,
-                                    'percentage': (pbar.n / len(candidate_files)) * 100,
-                                    'duplicates': duplicates,
-                                    'message': f"پردازش شده: {pbar.n}/{len(candidate_files)} | سرعت: {speed:.1f} فایل/ثانیه",
-                                    'status': f"پردازش هش: {pbar.n}/{len(candidate_files)}"
-                                })
-
-                            self.last_update_time = current_time
+                # گزارش پیشرفت هر 10 فایل
+                if completed % 10 == 0:
+                    progress = 60 + (completed / total) * 35
+                    speed = completed / (time.time() - start_time)
+                    self._report_progress(progress,
+                                          f"هش کردن: {completed}/{total} ({speed:.1f} فایل/ثانیه)")
 
             # Final results
             duplicate_groups = [group for group in file_hashes.values() if len(group) > 1]
             self.stats['groups_found'] = len(duplicate_groups)
             self.stats['hash_time'] = time.time() - hash_start_time
 
-            # لاگ‌گیری نتایج
             elapsed_time = time.time() - start_time
             self._log(f"✅ پردازش کامل شد. زمان: {elapsed_time:.2f} ثانیه")
-            self._log(f"📊 نتایج: {len(duplicate_groups)} گروه تکراری یافت شد")
 
             if duplicate_groups:
                 total_duplicates = sum(len(g) - 1 for g in duplicate_groups)
-                self._log(f"🗑️  تعداد فایل‌های تکراری قابل حذف: {total_duplicates}")
+                self._log(f"🗑️ تعداد فایل‌های تکراری قابل حذف: {total_duplicates}")
+                self._report_progress(100, f"✅ یافت شد: {len(duplicate_groups)} گروه، {total_duplicates} تکراری")
+            else:
+                self._report_progress(100, "✅ هیچ فایل تکراری یافت نشد")
 
-            # آپدیت stats نهایی
-            self.stats['total_time'] = elapsed_time
-            self.stats['files_per_second'] = (
-                self.stats['files_processed'] / elapsed_time
-                if elapsed_time > 0 else 0
-            )
-
-            self._log(f"📊 آمار عملکرد: {self.stats}")
-
-            return duplicate_groups  # ✅ بازگشت صحیح
+            return duplicate_groups
 
         except Exception as e:
             self._log(f"❌ خطا در فرآیند یافتن فایل‌های تکراری: {str(e)}", 'error')
+            self._report_progress(100, f"❌ خطا: {str(e)}")
             raise
 
     def _process_file_wrapper(self, file_path):

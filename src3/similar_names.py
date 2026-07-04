@@ -135,11 +135,9 @@ class SimilarNameFinder:
         try:
             path_obj = Path(file_path)
 
-            # بررسی وجود فایل
             if not path_obj.exists():
                 return None
 
-            # نام فایل
             filename = path_obj.name.lower()
 
             # ❌ فیلتر pattern‌های track-like و نام‌های بی‌معنی

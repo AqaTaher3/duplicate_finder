@@ -21,11 +21,12 @@ class FileHasher:
         self.max_workers = max_workers or min(32, (os.cpu_count() or 1) * 2)
         self.logger = log_manager.get_logger("FileHasher")
 
+        self.hash_times = []
+
         # کش حافظه
         self.memory_cache: Dict[str, str] = {}
         self.cache_max_size = 1000
 
-        # کش پایگاه داده - در child processها ایجاد نکن
         self.db_cache = None
         if cache_enabled and not self._is_child_process():
             try:
