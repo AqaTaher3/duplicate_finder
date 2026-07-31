@@ -6,6 +6,7 @@ __pycache__/
 hash_cache.db
 src/hash_cache.db
 
+
 # Distribution / packaging
 .Python
 build/
