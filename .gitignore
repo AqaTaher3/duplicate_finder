@@ -3,8 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.db
-hash_cache.db
-src/hash_cache.db
 
 
 # Distribution / packaging
