@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 *.db
 syncing/sync_log.txt
-
+# git rm --cached "syncing/sync_log.txt"
 
 # Distribution / packaging
 .Python
