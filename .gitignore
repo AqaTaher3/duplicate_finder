@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.db
-
+sync_log.txt
 
 # Distribution / packaging
 .Python
