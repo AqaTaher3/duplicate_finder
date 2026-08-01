@@ -1,7 +1,83 @@
+*.spec
+
+# =========================
+# Python
+# =========================
 __pycache__/
 *.py[cod]
-.pytest_cache/
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
 build/
 dist/
-*.spec
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# =========================
+# PyCharm / IntelliJ
+# =========================
+.idea/
+*.iml
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# Database
+# =========================
 *.db
+*.sqlite
+*.sqlite3
+
+# =========================
+# Cache
+# =========================
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# =========================
+# Coverage
+# =========================
+.coverage
+.coverage.*
+htmlcov/
+
+# =========================
+# Environment variables
+# =========================
+.env
+.env.*
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# Project specific
+# =========================
+hash_cache.db
+src/hash_cache.db
+syncing/sync_log.txt
